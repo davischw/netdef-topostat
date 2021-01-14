@@ -30,7 +30,7 @@ import threading
 import re
 from queue import Queue
 
-from junitparser import Failure, Skipped, TestSuite, TestCase
+from junitparser import Failure, Skipped, Element, TestSuite, TestCase
 
 from lib.config import ServerConfig, ClientConfig
 
@@ -191,10 +191,19 @@ class TopotestResult:
         self.version = TOPOSTAT_TTR_VERSION
         self.name = str(case.classname) + "." + str(case.name)
         if case.result:
-            if isinstance(case.result, Failure):
-                self.result = "failed"
-            elif isinstance(case.result, Skipped):
-                self.result = "skipped"
+            # junit parser version switch
+            if isinstance(case.result, list):
+                # junitparser v2.X
+                if isinstance(case.result[0], Failure):
+                    self.result = "failed"
+                elif isinstance(case.result[0], Skipped):
+                    self.result = "skipped"
+            else:
+                # junitparser v1.X
+                if isinstance(case.result, Failure):
+                    self.result = "failed"
+                elif isinstance(case.result, Skipped):
+                    self.result = "skipped"
         else:
             self.result = "passed"
         self.time = str(case.time)
