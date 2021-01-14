@@ -1,0 +1,17 @@
+[Unit]
+Description=NetDEF FRR Topotest Results Statistics Tool Server
+Wants=network-online.target
+StartLimitInterval=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=topostat
+Group=topostat
+WorkingDirectory=/var/lib/topostat/
+Restart=on-failure
+RestartSec=5
+ExecStart=/usr/bin/env python3 /usr/lib/topostat/server.py
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,242 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites><testsuite errors="0" failures="1" hostname="frr-damp-topotest" name="pytest" skipped="25" tests="28" time="41.940" timestamp="2021-01-05T12:16:30.245931"><testcase classname="bgp_features.test_bgp_features" file="bgp_features/test_bgp_features.py" line="147" name="test_ospf_convergence" time="27.252"><system-out>2021-01-05 12:16:32,089 INFO: loading topology: test_bgp_features
+2021-01-05 12:16:32,089 INFO: starting topology: test_bgp_features
+2021-01-05 12:16:32,208 INFO: r4 uses BGPd
+2021-01-05 12:16:32,242 INFO: r4: running version: 7.6-dev-dev-gUNKNOWN
+2021-01-05 12:16:34,176 INFO: r5 uses BGPd
+2021-01-05 12:16:34,200 INFO: r5: running version: 7.6-dev-dev-gUNKNOWN
+2021-01-05 12:16:36,034 INFO: r1 uses BGPd
+2021-01-05 12:16:36,038 INFO: r1 uses OSPFd
+2021-01-05 12:16:36,042 INFO: r1 uses OSPF6d
+2021-01-05 12:16:36,067 INFO: r1: running version: 7.6-dev-dev-gUNKNOWN
+2021-01-05 12:16:38,985 INFO: r2 uses BGPd
+2021-01-05 12:16:38,989 INFO: r2 uses OSPFd
+2021-01-05 12:16:38,993 INFO: r2 uses OSPF6d
+2021-01-05 12:16:39,018 INFO: r2: running version: 7.6-dev-dev-gUNKNOWN
+2021-01-05 12:16:41,924 INFO: r3 uses OSPFd
+2021-01-05 12:16:41,930 INFO: r3 uses OSPF6d
+2021-01-05 12:16:41,971 INFO: r3: running version: 7.6-dev-dev-gUNKNOWN
+2021-01-05 12:16:46,398 INFO: Checking OSPFv2 convergence on router r1
+2021-01-05 12:16:46,407 INFO: &apos;router_json_cmp&apos; polling started (interval 2 secs, maximum wait 120 secs)
+2021-01-05 12:16:54,227 INFO: &apos;router_json_cmp&apos; succeeded after 7.82 seconds
+2021-01-05 12:16:54,227 INFO: Checking OSPFv2 convergence on router r2
+2021-01-05 12:16:54,235 INFO: &apos;router_json_cmp&apos; polling started (interval 2 secs, maximum wait 120 secs)
+2021-01-05 12:16:54,695 INFO: &apos;router_json_cmp&apos; succeeded after 0.46 seconds
+2021-01-05 12:16:54,695 INFO: Checking OSPFv2 convergence on router r3
+2021-01-05 12:16:54,698 INFO: &apos;router_json_cmp&apos; polling started (interval 2 secs, maximum wait 120 secs)
+2021-01-05 12:16:57,591 INFO: &apos;router_json_cmp&apos; succeeded after 2.89 seconds
+</system-out></testcase><testcase classname="bgp_features.test_bgp_features" file="bgp_features/test_bgp_features.py" line="171" name="test_bgp_convergence" time="4.115"><system-out>2021-01-05 12:16:59,893 INFO: Checking BGP IPv4 convergence on router r1
+2021-01-05 12:16:59,897 INFO: &apos;router_json_cmp&apos; polling started (interval 2 secs, maximum wait 120 secs)
+2021-01-05 12:17:00,341 INFO: &apos;router_json_cmp&apos; succeeded after 0.44 seconds
+2021-01-05 12:17:00,341 INFO: Checking BGP IPv4 convergence on router r2
+2021-01-05 12:17:00,344 INFO: &apos;router_json_cmp&apos; polling started (interval 2 secs, maximum wait 120 secs)
+2021-01-05 12:17:00,791 INFO: &apos;router_json_cmp&apos; succeeded after 0.45 seconds
+2021-01-05 12:17:00,791 INFO: Checking BGP IPv4 convergence on router r4
+2021-01-05 12:17:00,794 INFO: &apos;router_json_cmp&apos; polling started (interval 2 secs, maximum wait 120 secs)
+2021-01-05 12:17:01,256 INFO: &apos;router_json_cmp&apos; succeeded after 0.46 seconds
+2021-01-05 12:17:01,256 INFO: Checking BGP IPv4 convergence on router r5
+2021-01-05 12:17:01,259 INFO: &apos;router_json_cmp&apos; polling started (interval 2 secs, maximum wait 120 secs)
+2021-01-05 12:17:01,708 INFO: &apos;router_json_cmp&apos; succeeded after 0.45 seconds
+</system-out></testcase><testcase classname="bgp_features.test_bgp_features" file="bgp_features/test_bgp_features.py" line="197" name="test_bgp_shutdown" time="6.541"><failure message="AssertionError: Generated failure ###XMLMARKER###
+assert False">def test_bgp_shutdown():
+        &quot;Test BGP instance shutdown&quot;
+    
+        tgen = get_topogen()
+    
+        # Skip if previous fatal error condition is raised
+        if tgen.routers_have_failure():
+            pytest.skip(tgen.errors)
+    
+        tgen.net[&quot;r1&quot;].cmd(
+            &apos;vtysh -c &quot;conf t&quot; -c &quot;router bgp 65000&quot; -c &quot;bgp shutdown message ABCDabcd&quot;&apos;
+        )
+    
+        # Check BGP Summary on local and remote routers
+        for rtrNum in [1, 2, 4]:
+            logger.info(
+                &quot;Checking BGP Summary after shutdown of R1 BGP on router r{}&quot;.format(rtrNum)
+            )
+    
+            router = tgen.gears[&quot;r{}&quot;.format(rtrNum)]
+            reffile = os.path.join(CWD, &quot;r{}/bgp_shutdown_summary.json&quot;.format(rtrNum))
+            expected = json.loads(open(reffile).read())
+    
+            test_func = functools.partial(
+                topotest.router_json_cmp, router, &quot;show ip bgp summary json&quot;, expected
+            )
+            _, res = topotest.run_and_expect(test_func, None, count=60, wait=2)
+            assertmsg = &quot;BGP sessions on router R{} are in incorrect state (not down as expected?)&quot;.format(
+                rtrNum
+            )
+            assert res is None, assertmsg
+    
+        # FAILURE
+&gt;       assert False, &quot;Generated failure ###XMLMARKER###&quot;
+E       AssertionError: Generated failure ###XMLMARKER###
+E       assert False
+
+test_bgp_features.py:231: AssertionError</failure><system-out>2021-01-05 12:17:04,439 INFO: Checking BGP Summary after shutdown of R1 BGP on router r1
+2021-01-05 12:17:04,447 INFO: &apos;router_json_cmp&apos; polling started (interval 2 secs, maximum wait 120 secs)
+2021-01-05 12:17:04,884 INFO: &apos;router_json_cmp&apos; succeeded after 0.44 seconds
+2021-01-05 12:17:04,884 INFO: Checking BGP Summary after shutdown of R1 BGP on router r2
+2021-01-05 12:17:04,888 INFO: &apos;router_json_cmp&apos; polling started (interval 2 secs, maximum wait 120 secs)
+2021-01-05 12:17:07,808 INFO: &apos;router_json_cmp&apos; succeeded after 2.92 seconds
+2021-01-05 12:17:07,808 INFO: Checking BGP Summary after shutdown of R1 BGP on router r4
+2021-01-05 12:17:07,811 INFO: &apos;router_json_cmp&apos; polling started (interval 2 secs, maximum wait 120 secs)
+2021-01-05 12:17:08,250 INFO: &apos;router_json_cmp&apos; succeeded after 0.44 seconds
+2021-01-05 12:17:08,250 INFO: test_bgp_features/test_bgp_shutdown
+</system-out><system-err>2021-01-05 12:17:08,250 ERROR: assert failed at &quot;test_bgp_features/test_bgp_shutdown&quot;: Generated failure ###XMLMARKER###
+assert False
+</system-err></testcase><testcase classname="bgp_features.test_bgp_features" file="bgp_features/test_bgp_features.py" line="233" name="test_bgp_shutdown_message" time="0.001"><skipped message="
+0: test_bgp_features/test_bgp_shutdown" type="pytest.skip">/root/frr/tests/topotests/bgp_features/test_bgp_features.py:241: 
+0: test_bgp_features/test_bgp_shutdown</skipped><system-out>2021-01-05 12:17:08,282 INFO: assert skipped at &quot;test_bgp_features/test_bgp_shutdown_message&quot;: 
+0: test_bgp_features/test_bgp_shutdown
+</system-out></testcase><testcase classname="bgp_features.test_bgp_features" file="bgp_features/test_bgp_features.py" line="264" name="test_bgp_no_shutdown" time="0.001"><skipped message="
+0: test_bgp_features/test_bgp_shutdown" type="pytest.skip">/root/frr/tests/topotests/bgp_features/test_bgp_features.py:272: 
+0: test_bgp_features/test_bgp_shutdown</skipped><system-out>2021-01-05 12:17:08,284 INFO: assert skipped at &quot;test_bgp_features/test_bgp_no_shutdown&quot;: 
+0: test_bgp_features/test_bgp_shutdown
+</system-out></testcase><testcase classname="bgp_features.test_bgp_features" file="bgp_features/test_bgp_features.py" line="297" name="test_bgp_metric_config" time="0.001"><skipped message="
+0: test_bgp_features/test_bgp_shutdown" type="pytest.skip">/root/frr/tests/topotests/bgp_features/test_bgp_features.py:305: 
+0: test_bgp_features/test_bgp_shutdown</skipped><system-out>2021-01-05 12:17:08,286 INFO: assert skipped at &quot;test_bgp_features/test_bgp_metric_config&quot;: 
+0: test_bgp_features/test_bgp_shutdown
+</system-out></testcase><testcase classname="bgp_features.test_bgp_features" file="bgp_features/test_bgp_features.py" line="476" name="test_bgp_metric_add_config" time="0.001"><skipped message="
+0: test_bgp_features/test_bgp_shutdown" type="pytest.skip">/root/frr/tests/topotests/bgp_features/test_bgp_features.py:484: 
+0: test_bgp_features/test_bgp_shutdown</skipped><system-out>2021-01-05 12:17:08,288 INFO: assert skipped at &quot;test_bgp_features/test_bgp_metric_add_config&quot;: 
+0: test_bgp_features/test_bgp_shutdown
+</system-out></testcase><testcase classname="bgp_features.test_bgp_features" file="bgp_features/test_bgp_features.py" line="496" name="test_bgp_metric_subtract_config" time="0.001"><skipped message="
+0: test_bgp_features/test_bgp_shutdown" type="pytest.skip">/root/frr/tests/topotests/bgp_features/test_bgp_features.py:504: 
+0: test_bgp_features/test_bgp_shutdown</skipped><system-out>2021-01-05 12:17:08,309 INFO: assert skipped at &quot;test_bgp_features/test_bgp_metric_subtract_config&quot;: 
+0: test_bgp_features/test_bgp_shutdown
+</system-out></testcase><testcase classname="bgp_features.test_bgp_features" file="bgp_features/test_bgp_features.py" line="516" name="test_bgp_set_metric" time="0.001"><skipped message="
+0: test_bgp_features/test_bgp_shutdown" type="pytest.skip">/root/frr/tests/topotests/bgp_features/test_bgp_features.py:524: 
+0: test_bgp_features/test_bgp_shutdown</skipped><system-out>2021-01-05 12:17:08,311 INFO: assert skipped at &quot;test_bgp_features/test_bgp_set_metric&quot;: 
+0: test_bgp_features/test_bgp_shutdown
+</system-out></testcase><testcase classname="bgp_features.test_bgp_features" file="bgp_features/test_bgp_features.py" line="543" name="test_bgp_remove_metric_rmaps" time="0.001"><skipped message="
+0: test_bgp_features/test_bgp_shutdown" type="pytest.skip">/root/frr/tests/topotests/bgp_features/test_bgp_features.py:551: 
+0: test_bgp_features/test_bgp_shutdown</skipped><system-out>2021-01-05 12:17:08,314 INFO: assert skipped at &quot;test_bgp_features/test_bgp_remove_metric_rmaps&quot;: 
+0: test_bgp_features/test_bgp_shutdown
+</system-out></testcase><testcase classname="bgp_features.test_bgp_features" file="bgp_features/test_bgp_features.py" line="620" name="test_bgp_norib" time="0.001"><skipped message="
+0: test_bgp_features/test_bgp_shutdown" type="pytest.skip">/root/frr/tests/topotests/bgp_features/test_bgp_features.py:628: 
+0: test_bgp_features/test_bgp_shutdown</skipped><system-out>2021-01-05 12:17:08,317 INFO: assert skipped at &quot;test_bgp_features/test_bgp_norib&quot;: 
+0: test_bgp_features/test_bgp_shutdown
+</system-out></testcase><testcase classname="bgp_features.test_bgp_features" file="bgp_features/test_bgp_features.py" line="644" name="test_bgp_norib_routes" time="0.001"><skipped message="
+0: test_bgp_features/test_bgp_shutdown" type="pytest.skip">/root/frr/tests/topotests/bgp_features/test_bgp_features.py:652: 
+0: test_bgp_features/test_bgp_shutdown</skipped><system-out>2021-01-05 12:17:08,320 INFO: assert skipped at &quot;test_bgp_features/test_bgp_norib_routes&quot;: 
+0: test_bgp_features/test_bgp_shutdown
+</system-out></testcase><testcase classname="bgp_features.test_bgp_features" file="bgp_features/test_bgp_features.py" line="691" name="test_bgp_disable_norib" time="0.001"><skipped message="
+0: test_bgp_features/test_bgp_shutdown" type="pytest.skip">/root/frr/tests/topotests/bgp_features/test_bgp_features.py:699: 
+0: test_bgp_features/test_bgp_shutdown</skipped><system-out>2021-01-05 12:17:08,323 INFO: assert skipped at &quot;test_bgp_features/test_bgp_disable_norib&quot;: 
+0: test_bgp_features/test_bgp_shutdown
+</system-out></testcase><testcase classname="bgp_features.test_bgp_features" file="bgp_features/test_bgp_features.py" line="719" name="test_bgp_disable_norib_routes" time="0.001"><skipped message="
+0: test_bgp_features/test_bgp_shutdown" type="pytest.skip">/root/frr/tests/topotests/bgp_features/test_bgp_features.py:727: 
+0: test_bgp_features/test_bgp_shutdown</skipped><system-out>2021-01-05 12:17:08,325 INFO: assert skipped at &quot;test_bgp_features/test_bgp_disable_norib_routes&quot;: 
+0: test_bgp_features/test_bgp_shutdown
+</system-out></testcase><testcase classname="bgp_features.test_bgp_features" file="bgp_features/test_bgp_features.py" line="766" name="test_bgp_delayopen_without" time="0.001"><skipped message="
+0: test_bgp_features/test_bgp_shutdown" type="pytest.skip">/root/frr/tests/topotests/bgp_features/test_bgp_features.py:771: 
+0: test_bgp_features/test_bgp_shutdown</skipped><system-out>2021-01-05 12:17:08,328 INFO: assert skipped at &quot;test_bgp_features/test_bgp_delayopen_without&quot;: 
+0: test_bgp_features/test_bgp_shutdown
+</system-out></testcase><testcase classname="bgp_features.test_bgp_features" file="bgp_features/test_bgp_features.py" line="842" name="test_bgp_delayopen_singular" time="0.001"><skipped message="
+0: test_bgp_features/test_bgp_shutdown" type="pytest.skip">/root/frr/tests/topotests/bgp_features/test_bgp_features.py:848: 
+0: test_bgp_features/test_bgp_shutdown</skipped><system-out>2021-01-05 12:17:08,330 INFO: assert skipped at &quot;test_bgp_features/test_bgp_delayopen_singular&quot;: 
+0: test_bgp_features/test_bgp_shutdown
+</system-out></testcase><testcase classname="bgp_features.test_bgp_features" file="bgp_features/test_bgp_features.py" line="955" name="test_bgp_delayopen_dual" time="0.001"><skipped message="
+0: test_bgp_features/test_bgp_shutdown" type="pytest.skip">/root/frr/tests/topotests/bgp_features/test_bgp_features.py:960: 
+0: test_bgp_features/test_bgp_shutdown</skipped><system-out>2021-01-05 12:17:08,332 INFO: assert skipped at &quot;test_bgp_features/test_bgp_delayopen_dual&quot;: 
+0: test_bgp_features/test_bgp_shutdown
+</system-out></testcase><testcase classname="bgp_features.test_bgp_features" file="bgp_features/test_bgp_features.py" line="1113" name="test_bgp_dampening_setup" time="0.001"><skipped message="
+0: test_bgp_features/test_bgp_shutdown" type="pytest.skip">/root/frr/tests/topotests/bgp_features/test_bgp_features.py:1124: 
+0: test_bgp_features/test_bgp_shutdown</skipped><system-out>2021-01-05 12:17:08,334 INFO: assert skipped at &quot;test_bgp_features/test_bgp_dampening_setup&quot;: 
+0: test_bgp_features/test_bgp_shutdown
+</system-out></testcase><testcase classname="bgp_features.test_bgp_features" file="bgp_features/test_bgp_features.py" line="1197" name="test_bgp_dampening_route_announce" time="0.001"><skipped message="
+0: test_bgp_features/test_bgp_shutdown" type="pytest.skip">/root/frr/tests/topotests/bgp_features/test_bgp_features.py:1208: 
+0: test_bgp_features/test_bgp_shutdown</skipped><system-out>2021-01-05 12:17:08,337 INFO: assert skipped at &quot;test_bgp_features/test_bgp_dampening_route_announce&quot;: 
+0: test_bgp_features/test_bgp_shutdown
+</system-out></testcase><testcase classname="bgp_features.test_bgp_features" file="bgp_features/test_bgp_features.py" line="1259" name="test_bgp_dampening_disabled" time="0.001"><skipped message="
+0: test_bgp_features/test_bgp_shutdown" type="pytest.skip">/root/frr/tests/topotests/bgp_features/test_bgp_features.py:1270: 
+0: test_bgp_features/test_bgp_shutdown</skipped><system-out>2021-01-05 12:17:08,339 INFO: assert skipped at &quot;test_bgp_features/test_bgp_dampening_disabled&quot;: 
+0: test_bgp_features/test_bgp_shutdown
+</system-out></testcase><testcase classname="bgp_features.test_bgp_features" file="bgp_features/test_bgp_features.py" line="1317" name="test_bgp_dampening_config" time="0.001"><skipped message="
+0: test_bgp_features/test_bgp_shutdown" type="pytest.skip">/root/frr/tests/topotests/bgp_features/test_bgp_features.py:1330: 
+0: test_bgp_features/test_bgp_shutdown</skipped><system-out>2021-01-05 12:17:08,343 INFO: assert skipped at &quot;test_bgp_features/test_bgp_dampening_config&quot;: 
+0: test_bgp_features/test_bgp_shutdown
+</system-out></testcase><testcase classname="bgp_features.test_bgp_features" file="bgp_features/test_bgp_features.py" line="1382" name="test_bgp_dampening_profile_peer_over_group" time="0.001"><skipped message="
+0: test_bgp_features/test_bgp_shutdown" type="pytest.skip">/root/frr/tests/topotests/bgp_features/test_bgp_features.py:1396: 
+0: test_bgp_features/test_bgp_shutdown</skipped><system-out>2021-01-05 12:17:08,346 INFO: assert skipped at &quot;test_bgp_features/test_bgp_dampening_profile_peer_over_group&quot;: 
+0: test_bgp_features/test_bgp_shutdown
+</system-out></testcase><testcase classname="bgp_features.test_bgp_features" file="bgp_features/test_bgp_features.py" line="1448" name="test_bgp_dampening_profile_group_over_global" time="0.001"><skipped message="
+0: test_bgp_features/test_bgp_shutdown" type="pytest.skip">/root/frr/tests/topotests/bgp_features/test_bgp_features.py:1462: 
+0: test_bgp_features/test_bgp_shutdown</skipped><system-out>2021-01-05 12:17:08,349 INFO: assert skipped at &quot;test_bgp_features/test_bgp_dampening_profile_group_over_global&quot;: 
+0: test_bgp_features/test_bgp_shutdown
+</system-out></testcase><testcase classname="bgp_features.test_bgp_features" file="bgp_features/test_bgp_features.py" line="1514" name="test_bgp_dampening_profile_peer_over_global" time="0.001"><skipped message="
+0: test_bgp_features/test_bgp_shutdown" type="pytest.skip">/root/frr/tests/topotests/bgp_features/test_bgp_features.py:1528: 
+0: test_bgp_features/test_bgp_shutdown</skipped><system-out>2021-01-05 12:17:08,351 INFO: assert skipped at &quot;test_bgp_features/test_bgp_dampening_profile_peer_over_global&quot;: 
+0: test_bgp_features/test_bgp_shutdown
+</system-out></testcase><testcase classname="bgp_features.test_bgp_features" file="bgp_features/test_bgp_features.py" line="1580" name="test_bgp_dampening_profile_global" time="0.001"><skipped message="
+0: test_bgp_features/test_bgp_shutdown" type="pytest.skip">/root/frr/tests/topotests/bgp_features/test_bgp_features.py:1593: 
+0: test_bgp_features/test_bgp_shutdown</skipped><system-out>2021-01-05 12:17:08,353 INFO: assert skipped at &quot;test_bgp_features/test_bgp_dampening_profile_global&quot;: 
+0: test_bgp_features/test_bgp_shutdown
+</system-out></testcase><testcase classname="bgp_features.test_bgp_features" file="bgp_features/test_bgp_features.py" line="1643" name="test_bgp_dampening_withdaw" time="0.001"><skipped message="
+0: test_bgp_features/test_bgp_shutdown" type="pytest.skip">/root/frr/tests/topotests/bgp_features/test_bgp_features.py:1654: 
+0: test_bgp_features/test_bgp_shutdown</skipped><system-out>2021-01-05 12:17:08,356 INFO: assert skipped at &quot;test_bgp_features/test_bgp_dampening_withdaw&quot;: 
+0: test_bgp_features/test_bgp_shutdown
+</system-out></testcase><testcase classname="bgp_features.test_bgp_features" file="bgp_features/test_bgp_features.py" line="1674" name="test_bgp_dampening_cleanup" time="0.001"><skipped message="
+0: test_bgp_features/test_bgp_shutdown" type="pytest.skip">/root/frr/tests/topotests/bgp_features/test_bgp_features.py:1688: 
+0: test_bgp_features/test_bgp_shutdown</skipped><system-out>2021-01-05 12:17:08,358 INFO: assert skipped at &quot;test_bgp_features/test_bgp_dampening_cleanup&quot;: 
+0: test_bgp_features/test_bgp_shutdown
+</system-out></testcase><testcase classname="bgp_features.test_bgp_features" file="bgp_features/test_bgp_features.py" line="1735" name="test_bgp_dampening_aftermath" time="3.822"><skipped message="
+0: test_bgp_features/test_bgp_shutdown" type="pytest.skip">/root/frr/tests/topotests/bgp_features/test_bgp_features.py:1746: 
+0: test_bgp_features/test_bgp_shutdown</skipped><system-out>2021-01-05 12:17:08,360 INFO: assert skipped at &quot;test_bgp_features/test_bgp_dampening_aftermath&quot;: 
+0: test_bgp_features/test_bgp_shutdown
+2021-01-05 12:17:08,361 INFO: stopping topology: test_bgp_features
+2021-01-05 12:17:08,363 INFO: r4: stopping bgpd
+2021-01-05 12:17:08,364 INFO: r4: stopping staticd
+2021-01-05 12:17:08,366 INFO: r4: stopping zebra
+2021-01-05 12:17:08,381 INFO: r4: stopping bgpd
+2021-01-05 12:17:08,389 INFO: r4: stopping staticd
+2021-01-05 12:17:08,390 INFO: r4: stopping zebra
+2021-01-05 12:17:08,405 INFO: r4: waiting for daemons stopping: bgpd, zebra (0.1 seconds)
+2021-01-05 12:17:08,521 INFO: r5: stopping bgpd
+2021-01-05 12:17:08,528 INFO: r5: stopping staticd
+2021-01-05 12:17:08,530 INFO: r5: stopping zebra
+2021-01-05 12:17:08,533 INFO: r5: stopping bgpd
+2021-01-05 12:17:08,534 INFO: r5: stopping staticd
+2021-01-05 12:17:08,535 INFO: r5: stopping zebra
+2021-01-05 12:17:08,560 INFO: r5: waiting for daemons stopping: bgpd, zebra (0.1 seconds)
+2021-01-05 12:17:08,676 INFO: stopping &quot;sw10&quot;
+2021-01-05 12:17:08,679 INFO: r1: stopping bgpd
+2021-01-05 12:17:08,680 INFO: r1: stopping ospf6d
+2021-01-05 12:17:08,685 INFO: r1: stopping ospfd
+2021-01-05 12:17:08,687 INFO: r1: stopping staticd
+2021-01-05 12:17:08,700 INFO: r1: stopping zebra
+2021-01-05 12:17:08,716 INFO: r1: stopping bgpd
+2021-01-05 12:17:08,722 INFO: r1: stopping ospf6d
+2021-01-05 12:17:08,729 INFO: r1: stopping ospfd
+2021-01-05 12:17:08,745 INFO: r1: stopping zebra
+2021-01-05 12:17:08,754 INFO: r1: waiting for daemons stopping: bgpd, ospf6d, zebra (0.1 seconds)
+2021-01-05 12:17:08,877 INFO: r2: stopping bgpd
+2021-01-05 12:17:08,879 INFO: r2: stopping ospf6d
+2021-01-05 12:17:08,886 INFO: r2: stopping ospfd
+2021-01-05 12:17:08,888 INFO: r2: stopping staticd
+2021-01-05 12:17:08,889 INFO: r2: stopping zebra
+2021-01-05 12:17:08,913 INFO: r2: stopping bgpd
+2021-01-05 12:17:08,922 INFO: r2: stopping ospf6d
+2021-01-05 12:17:08,924 INFO: r2: stopping ospfd
+2021-01-05 12:17:08,926 INFO: r2: stopping zebra
+2021-01-05 12:17:08,956 INFO: r2: waiting for daemons stopping: bgpd, zebra (0.1 seconds)
+2021-01-05 12:17:09,078 INFO: r3: stopping ospf6d
+2021-01-05 12:17:09,080 INFO: r3: stopping ospfd
+2021-01-05 12:17:09,084 INFO: r3: stopping staticd
+2021-01-05 12:17:09,086 INFO: r3: stopping zebra
+2021-01-05 12:17:09,109 INFO: r3: stopping ospf6d
+2021-01-05 12:17:09,114 INFO: r3: stopping ospfd
+2021-01-05 12:17:09,123 INFO: r3: stopping zebra
+2021-01-05 12:17:09,130 INFO: r3: waiting for daemons stopping: ospf6d, ospfd, zebra (0.1 seconds)
+2021-01-05 12:17:09,275 INFO: stopping &quot;sw9&quot;
+2021-01-05 12:17:09,276 INFO: stopping &quot;sw8&quot;
+2021-01-05 12:17:09,280 INFO: stopping &quot;sw6&quot;
+2021-01-05 12:17:09,280 INFO: stopping &quot;sw1&quot;
+2021-01-05 12:17:09,280 INFO: stopping &quot;sw3&quot;
+2021-01-05 12:17:09,281 INFO: stopping &quot;sw2&quot;
+2021-01-05 12:17:09,281 INFO: stopping &quot;sw5&quot;
+2021-01-05 12:17:09,281 INFO: stopping &quot;sw4&quot;
+2021-01-05 12:17:09,281 INFO: stopping &quot;sw7&quot;
+</system-out></testcase></testsuite></testsuites>
