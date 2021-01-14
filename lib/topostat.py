@@ -29,6 +29,7 @@ import hashlib
 import threading
 import re
 from queue import Queue
+from socket import gethostname
 
 from junitparser import Failure, Skipped, Element, TestSuite, TestCase
 
@@ -182,9 +183,9 @@ class TopotestResult:
             return None
 
     def from_case(self, case, suite, plan, build, job):
-        if case is None or suite is None:
+        if case is None:
             return None
-        if not isinstance(suite, TestSuite) or not isinstance(case, TestCase):
+        if not isinstance(case, TestCase):
             return None
         if plan is None or build is None or job is None:
             return None
@@ -207,8 +208,16 @@ class TopotestResult:
         else:
             self.result = "passed"
         self.time = str(case.time)
-        self.host = str(suite.hostname)
-        self.timestamp = str(suite.timestamp).replace("T", " ")
+
+        if suite is None:
+            self.host = gethostname()
+            self.timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
+        else:
+            if not isinstance(suite, TestSuite):
+                return None
+            self.host = str(suite.hostname)
+            self.timestamp = str(suite.timestamp).replace("T", " ")
+
         self.plan = str(plan)
         self.build = str(build)
         self.job = str(job)

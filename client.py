@@ -27,7 +27,7 @@ import argparse
 from threading import Timer
 
 from configparser import ConfigParser
-from junitparser import JUnitXml
+from junitparser import JUnitXml, TestSuite, TestCase
 import zmq
 
 from lib.topostat import Logger, Message, TopotestResult, compose_zmq_address_str
@@ -146,9 +146,24 @@ def main():
     results_total = 0
     results = []
     for suite in xml:
-        for case in suite:
+        if isinstance(suite, TestSuite):
+            for case in suite:
+                results_total += 1
+                result = TopotestResult().from_case(case, suite, plan, build, job)
+                # check result
+                if not result.check():
+                    results_invalid += 1
+                    continue
+                # do not report if test was skipped
+                if result.skipped():
+                    results_skipped += 1
+                    continue
+                # append to results list
+                results.append(result.to_json())
+                results_valid += 1
+        elif isinstance(suite, TestCase):
             results_total += 1
-            result = TopotestResult().from_case(case, suite, plan, build, job)
+            result = TopotestResult().from_case(suite, None, plan, build, job)
             # check result
             if not result.check():
                 results_invalid += 1
