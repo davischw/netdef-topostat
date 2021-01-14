@@ -224,11 +224,19 @@ class TopotestResult:
         return self
 
     def check(self):
-        if self.version is None or not isinstance(self.version, int):
-            return False
-        for var in list(self.__dict__.values())[1:]:
-            if var is None or not isinstance(var, str) or var == "":
+        for var in list(self.__dict__.values()):
+            if var is None:
                 return False
+            elif isinstance(var, int):
+                continue
+            elif isinstance(var, str):
+                if var == "":
+                    return False
+                continue
+            else:
+                return False
+        if not isinstance(self.version, int):
+            return False
         if self.version != TOPOSTAT_TTR_VERSION:
             return False
         return True
