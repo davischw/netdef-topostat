@@ -29,7 +29,7 @@ import sqlite3
 
 import zmq
 
-from lib.topostat import Logger, Message, TopotestResult, compose_zmq_address_str
+from lib.topostat import Logger, Message, TopotestResult
 from lib.config import ServerConfig, read_config_file
 
 
@@ -99,19 +99,32 @@ def parse_cli_arguments(conf, log):
     ap.add_argument("-v", "--verbose", help="verbosity", action="store_true")
     ap.add_argument("-d", "--debug", help="debug messages", action="store_true")
     ap.add_argument("-c", "--config", help="configuration file")
-    ap.add_argument("-a", "--address", help="server address")
-    ap.add_argument("-p", "--port", help="server tcp port")
+    ap.add_argument(
+        "-n6", "--no-ipv6", help="no ipv6 listen address", action="store_true"
+    )
+    ap.add_argument("-a6", "--ipv6-address", help="server ipv6 address")
+    ap.add_argument("-p6", "--ipv6-port", help="server ipv6 tcp port")
+    ap.add_argument(
+        "-n4", "--no-ipv4", help="no ipv4 listen address", action="store_true"
+    )
+    ap.add_argument("-a4", "--ipv4-address", help="server ipv4 address")
+    ap.add_argument("-p4", "--ipv4-port", help="server ipv4 tcp port")
     ap.add_argument("-k", "--key", help="authentication key")
     ap.add_argument("-b", "--database", help="sqlite3 database file")
     ap.add_argument("-l", "--log", help="log file")
+
     try:
         args = vars(ap.parse_args())
         conf_to_args = {
             "verbose": "verbose",
             "debug": "debug",
             "config_file": "config",
-            "server_address": "address",
-            "server_port": "port",
+            "server_no_ipv6": "no_ipv6",
+            "server_address_ipv6": "ipv6_address",
+            "server_port_ipv6": "ipv6_port",
+            "server_no_ipv4": "no_ipv4",
+            "server_address_ipv4": "ipv4_address",
+            "server_port_ipv4": "ipv4_port",
             "auth_key": "key",
             "sqlite3_db": "database",
             "log_file": "log",
@@ -187,14 +200,24 @@ def main():
     log.info("writing to log file {}".format(conf.log_file))
     log.start()
 
-    # compose ZeroMQ server socket address string
-    try:
-        compose_zmq_address_str(conf, log)
-    except:
-        log.abort("failed to compose ZeroMQ server socket address string")
-
-    if conf.server_address_type == "DNS":
-        log.abort("ZeroMQ does not allow to bind server socket to a DNS addresses")
+    # compose ZeroMQ server socket address strings
+    if conf.server_no_ipv4 and conf.server_no_ipv6:
+        log.abort("neither using ipv4 or ipv6")
+    else:
+        if not conf.server_no_ipv4:
+            conf.socket_address_ipv4_str = "tcp://{}:{}".format(
+                conf.server_address_ipv4, conf.server_port_ipv4
+            )
+            log.debug(
+                "conf.socket_address_ipv4_str = {}".format(conf.socket_address_ipv4_str)
+            )
+        if not conf.server_no_ipv6:
+            conf.socket_address_ipv6_str = "tcp://[{}]:{}".format(
+                conf.server_address_ipv6, conf.server_port_ipv6
+            )
+            log.debug(
+                "conf.socket_address_ipv6_str = {}".format(conf.socket_address_ipv6_str)
+            )
 
     # connect to sqlite3 db
     try:
@@ -235,23 +258,44 @@ def main():
         "using table {} in database {}".format(conf.results_table, conf.sqlite3_db)
     )
 
-    # create ZeroMQ context and bind to socket
-    context = zmq.Context()
-    sock = context.socket(zmq.PULL)
-    if conf.server_address_type == "IPV6":
-        sock.setsockopt(zmq.IPV6, True)
-    try:
-        sock.bind(conf.socket_address_str)
-        log.info(
-            "bound ZeroMQ PULL socket to address {}".format(conf.socket_address_str)
-        )
-    except:
-        conn.close()
-        log.abort(
-            "failed to bind ZeroMQ PULL socket to address {}".format(
-                conf.socket_address_str
+    # create ZeroMQ contexts and bind to sockets
+    if not conf.server_no_ipv6:
+        context_ipv6 = zmq.Context()
+        sock_ipv6 = context_ipv6.socket(zmq.PULL)
+        sock_ipv6.setsockopt(zmq.RCVTIMEO, conf.socket_recv_timeout_ms)
+        sock_ipv6.setsockopt(zmq.IPV6, True)
+        try:
+            sock_ipv6.bind(conf.socket_address_ipv6_str)
+            log.info(
+                "bound ZeroMQ PULL ipv6 socket to address {}".format(
+                    conf.socket_address_ipv6_str
+                )
             )
-        )
+        except:
+            conn.close()
+            log.abort(
+                "failed to bind ZeroMQ PULL ipv6 socket to address {}".format(
+                    conf.socket_address_ipv6_str
+                )
+            )
+    if not conf.server_no_ipv4:
+        context_ipv4 = zmq.Context()
+        sock_ipv4 = context_ipv4.socket(zmq.PULL)
+        sock_ipv4.setsockopt(zmq.RCVTIMEO, conf.socket_recv_timeout_ms)
+        try:
+            sock_ipv4.bind(conf.socket_address_ipv4_str)
+            log.info(
+                "bound ZeroMQ PULL ipv4 socket to address {}".format(
+                    conf.socket_address_ipv4_str
+                )
+            )
+        except:
+            conn.close()
+            log.abort(
+                "failed to bind ZeroMQ PULL ipv4 socket to address {}".format(
+                    conf.socket_address_ipv4_str
+                )
+            )
 
     # signal handling
     signal.signal(signal.SIGINT, signal_handler_sigint)
@@ -260,11 +304,27 @@ def main():
     # main loop, process incoming topotest results
     while conf.run:
         # receive json object with test results
-        try:
-            json_msg = sock.recv_json()
-        except TerminationSignalReceived:
-            continue
-        except:
+        while conf.run:
+            if not conf.server_no_ipv6:
+                json_msg = None
+                try:
+                    json_msg = sock_ipv6.recv_json()
+                    break
+                except TerminationSignalReceived:
+                    break
+                except:
+                    pass
+            if not conf.server_no_ipv4:
+                json_msg = None
+                try:
+                    json_msg = sock_ipv4.recv_json()
+                    break
+                except TerminationSignalReceived:
+                    break
+                except:
+                    pass
+
+        if json_msg is None:
             log.warn("failed to receive ZeroMQ message")
             continue
 
@@ -282,12 +342,23 @@ def main():
         # process received test results
         process_received_results(msg.payload, conn, conf, log)
 
-    # closing socket and terminating ZeroMQ context
-    sock.close()
-    context.term()
-    log.info(
-        "closed ZeroMQ PULL socket bound to address {}".format(conf.socket_address_str)
-    )
+    # closing sockets and terminating ZeroMQ contexts
+    if not conf.server_no_ipv6:
+        sock_ipv6.close()
+        context_ipv6.term()
+        log.info(
+            "closed ZeroMQ PULL ipv6 socket bound to address {}".format(
+                conf.socket_address_ipv6_str
+            )
+        )
+    if not conf.server_no_ipv4:
+        sock_ipv4.close()
+        context_ipv4.term()
+        log.info(
+            "closed ZeroMQ PULL ipv4 socket bound to address {}".format(
+                conf.socket_address_ipv4_str
+            )
+        )
 
     # closing database connection
     conn.close()

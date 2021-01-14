@@ -30,7 +30,7 @@ from configparser import ConfigParser
 from junitparser import JUnitXml, TestSuite, TestCase
 import zmq
 
-from lib.topostat import Logger, Message, TopotestResult, compose_zmq_address_str
+from lib.topostat import Logger, Message, TopotestResult, compose_zmq_client_address_str
 from lib.config import ClientConfig, read_config_file
 
 
@@ -114,7 +114,7 @@ def main():
 
     # compose ZeroMQ server address string
     try:
-        compose_zmq_address_str(conf, log)
+        compose_zmq_client_address_str(conf, log)
     except:
         log.abort("failed to compose ZeroMQ server address string")
 

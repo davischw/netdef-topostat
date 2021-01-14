@@ -47,11 +47,20 @@ class ServerConfig:
         self.default_config_file = "/etc/topostat.conf"
         self.config_file = None
 
-        # server socket
-        self.server_address_type = None
-        self.server_address = "127.0.0.1"
-        self.server_port = 5678
-        self.socket_address_str = ""
+        # server ipv6 socket
+        self.server_no_ipv6 = False
+        self.server_address_ipv6 = "::1"
+        self.server_port_ipv6 = 5678
+        self.socket_address_ipv6_str = ""
+
+        # server ipv4 socket
+        self.server_no_ipv4 = False
+        self.server_address_ipv4 = "127.0.0.1"
+        self.server_port_ipv4 = 5678
+        self.socket_address_ipv4_str = ""
+
+        # sockets receive timeout in milliseconds
+        self.socket_recv_timeout_ms = 100
 
         # authentication
         self.auth_key = ""
@@ -62,7 +71,7 @@ class ServerConfig:
 
     # returns list of boolean config values
     def bools(self):
-        return ["verbose", "debug"]
+        return ["verbose", "debug", "server_no_ipv4", "server_no_ipv6"]
 
 
 class ClientConfig:

@@ -369,7 +369,7 @@ class Logger:
             pass
 
 
-def compose_zmq_address_str(conf, log):
+def compose_zmq_client_address_str(conf, log):
     server_address_types = ["IPV4", "IPV6", "DNS"]
 
     if conf.server_address_type is None:
