@@ -128,6 +128,13 @@ def read_config_file(config_file, conf, log):
                             cp[conf.config_section].getboolean(var),
                         )
                     )
+                elif var == "auth_key":
+                    conf.__dict__[var] = val
+                    log.debug(
+                        "conf.{} = cfg[{}][{}] = ***auth_key***".format(
+                            var, conf.config_section, var
+                        )
+                    )
                 else:
                     conf.__dict__[var] = val
                     log.debug(

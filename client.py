@@ -71,6 +71,11 @@ def parse_cli_arguments(conf, log):
                                 conf_var, arg_val
                             )
                         )
+                elif conf_var == "auth_key":
+                    conf.__dict__[conf_var] = args[arg_val]
+                    log.debug(
+                        "conf.{} = args[{}] = ***auth_key***".format(conf_var, arg_val)
+                    )
                 else:
                     conf.__dict__[conf_var] = args[arg_val]
                     log.debug(
