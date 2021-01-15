@@ -118,9 +118,7 @@ def main():
     log.start()
 
     # compose ZeroMQ server address string
-    try:
-        compose_zmq_client_address_str(conf, log)
-    except:
+    if compose_zmq_client_address_str(conf, log) is None:
         log.abort("failed to compose ZeroMQ server address string")
 
     # get bamboo environment variables

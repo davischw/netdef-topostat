@@ -29,7 +29,7 @@ import hashlib
 import threading
 import re
 from queue import Queue
-from socket import gethostname
+import socket
 
 from junitparser import Failure, Skipped, Element, TestSuite, TestCase
 
@@ -210,7 +210,7 @@ class TopotestResult:
         self.time = str(case.time)
 
         if suite is None:
-            self.host = gethostname()
+            self.host = socket.gethostname()
             self.timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
         else:
             if not isinstance(suite, TestSuite):
@@ -382,16 +382,29 @@ def compose_zmq_client_address_str(conf, log):
     log.debug("conf.server_address_type = {}".format(conf.server_address_type))
 
     if conf.server_address_type in server_address_types:
-        if conf.server_address_type in ["IPV4", "DNS"]:
+        if conf.server_address_type == "IPV6":
+            conf.socket_address_str = "tcp://[{}]:{}".format(
+                conf.server_address, conf.server_port
+            )
+        elif conf.server_address_type == "IPV4":
             conf.socket_address_str = "tcp://{}:{}".format(
                 conf.server_address, conf.server_port
             )
         else:
-            conf.socket_address_str = "tcp://[{}]:{}".format(
-                conf.server_address, conf.server_port
-            )
+            dns_addr = conf.server_address
+            try:
+                conf.server_address = socket.gethostbyname(dns_addr)
+            except:
+                log.err("failed to resolve DNS server address {}".format(dns_addr))
+                return None
+            log.debug("conf.server_address = {} (DNS resolved {})".format(conf.server_address, dns_addr))
+            conf.server_address_type = None
+            log.debug("conf.server_address_type = None")
+            log.info("resolved DNS server address {} to ip address {}".format(dns_addr, conf.server_address))
+            return compose_zmq_client_address_str(conf, log)
     else:
-        log.abort("invalid server address type {}".format(conf.server_address_type))
+        log.err("invalid server address type {}".format(conf.server_address_type))
+        return None
 
     log.debug("conf.socket_address_str = {}".format(conf.socket_address_str))
     return conf.socket_address_str
