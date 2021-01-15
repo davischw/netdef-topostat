@@ -117,10 +117,6 @@ def main():
     log.info("writing to log file {}".format(conf.log_file))
     log.start()
 
-    # compose ZeroMQ server address string
-    if compose_zmq_client_address_str(conf, log) is None:
-        log.abort("failed to compose ZeroMQ server address string")
-
     # get bamboo environment variables
     try:
         plan = os.environ["bamboo_planKey"]
@@ -134,6 +130,10 @@ def main():
         job = os.environ["bamboo_shortJobName"]
     except:
         log.abort("failed to get environment variable bamboo_shortJobName")
+
+    # compose ZeroMQ server address string (includes DNS resolve)
+    if compose_zmq_client_address_str(conf, log) is None:
+        log.abort("failed to compose ZeroMQ server address string")
 
     # parse junit xml file
     try:
