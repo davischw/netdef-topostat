@@ -66,7 +66,7 @@ class ServerConfig:
         self.auth_key = ""
 
         # sqlite3 database
-        self.sqlite3_db = "/var/lib/topostat/topotests.db"
+        self.sqlite3_db = "/home/topostat/topotests.db"
         self.results_table = "testresults"
 
     # returns list of boolean config values

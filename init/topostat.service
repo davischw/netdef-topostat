@@ -8,10 +8,10 @@ StartLimitBurst=5
 Type=simple
 User=topostat
 Group=topostat
-WorkingDirectory=/var/lib/topostat/
+WorkingDirectory=/home/topostat/
 Restart=on-failure
 RestartSec=5
-ExecStart=/usr/bin/env python3 /usr/lib/topostat/server.py
+ExecStart=/usr/bin/env python3 /usr/local/lib/topostat/server.py
 
 [Install]
 WantedBy=multi-user.target
