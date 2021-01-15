@@ -42,7 +42,7 @@ def watchdog_handler(log):
 # parse cli arguments
 def parse_cli_arguments(conf, log):
     ap = argparse.ArgumentParser()
-    ap.add_argument("-v", "--verbose", help="verbosity", action="store_true")
+    ap.add_argument("-v", "--verbose", help="verbose output", action="store_true")
     ap.add_argument("-d", "--debug", help="debug messages", action="store_true")
     ap.add_argument("-c", "--config", help="configuration file")
     ap.add_argument("-a", "--address", help="server address")

@@ -397,10 +397,18 @@ def compose_zmq_client_address_str(conf, log):
             except:
                 log.err("failed to resolve DNS server address {}".format(dns_addr))
                 return None
-            log.debug("conf.server_address = {} (DNS resolved {})".format(conf.server_address, dns_addr))
+            log.debug(
+                "conf.server_address = {} (DNS resolved {})".format(
+                    conf.server_address, dns_addr
+                )
+            )
             conf.server_address_type = None
             log.debug("conf.server_address_type = None")
-            log.info("resolved DNS server address {} to ip address {}".format(dns_addr, conf.server_address))
+            log.info(
+                "resolved DNS server address {} to ip address {}".format(
+                    dns_addr, conf.server_address
+                )
+            )
             return compose_zmq_client_address_str(conf, log)
     else:
         log.err("invalid server address type {}".format(conf.server_address_type))
