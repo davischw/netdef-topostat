@@ -185,12 +185,15 @@ class TopotestResult:
             return None
         return self
 
-    def from_case(self, case, suite, plan, build, job):
-        if case is None:
+    def from_case(self, case, host, plan, build, job):
+        if case is None or not isinstance(case, TestCase):
             return None
-        if not isinstance(case, TestCase):
-            return None
-        if plan is None or build is None or job is None:
+        if not (
+            check.is_str_no_empty(host)
+            and check.is_str_no_empty(plan)
+            and check.is_str_no_empty(build)
+            and check.is_str_no_empty(job)
+        ):
             return None
         self.version = TOPOSTAT_TTR_VERSION
         self.name = str(case.classname) + "." + str(case.name)
@@ -211,22 +214,11 @@ class TopotestResult:
         else:
             self.result = "passed"
         self.time = str(case.time)
-
-        if suite is None:
-            self.host = socket.gethostname()
-            self.timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
-        else:
-            if not isinstance(suite, TestSuite):
-                return None
-            if check.is_str_no_empty(suite.hostname):
-                self.host = suite.hostname
-            else:
-                self.host = socket.gethostname()
-            self.timestamp = str(suite.timestamp).replace("T", " ")
-
-        self.plan = str(plan)
-        self.build = str(build)
-        self.job = str(job)
+        self.host = host
+        self.timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
+        self.plan = plan
+        self.build = build
+        self.job = job
         return self
 
     def check(self):
@@ -422,3 +414,26 @@ def compose_zmq_client_address_str(conf, log):
 
     log.debug("conf.socket_address_str = {}".format(conf.socket_address_str))
     return conf.socket_address_str
+
+
+def determine_client_sender_id(conf):
+    """
+    Determine sender identification from either configured values or by
+    attempting to get the machines hostname. This process can fail due to weird
+    behaviour of python socket wrapper functions in connection with exotic
+    network stack configurations (LCX, Jails, etc.).
+    """
+
+    # check if sender identification is already configured
+    if check.is_str_no_empty(conf.sender_id) and conf.sender_id != "None":
+        return True
+
+    # otherwise use hostname
+    conf.sender_id = socket.gethostname()
+    if check.is_str_no_empty(conf.sender_id):
+        return True
+
+    # or cause the configuration check to abort the program, if
+    # socket.gethostname() fails
+    conf.sender_id = None
+    return False

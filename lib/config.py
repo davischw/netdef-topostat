@@ -194,6 +194,7 @@ class ClientConfig(Config):
         self.server_port = 5678
         self.socket_address_str = ""
         self.connection_timeout = 15
+        self.sender_id = ""
 
         # authentication
         self.auth_key = ""

@@ -26,16 +26,22 @@ import sys
 import argparse
 from threading import Timer
 
-from configparser import ConfigParser
 from junitparser import JUnitXml, TestSuite, TestCase
 import zmq
 
-from lib.topostat import Logger, Message, TopotestResult, compose_zmq_client_address_str
+from lib.topostat import (
+    Logger,
+    Message,
+    TopotestResult,
+    compose_zmq_client_address_str,
+    determine_client_sender_id,
+)
 from lib.config import ClientConfig, read_config_file
 import lib.check as check
 
 
-# Upload watchdog handler to terminate non-responsive ZeroMQ connect and send threads
+# Upload watchdog handler to terminate non-responsive ZeroMQ connect and send
+# threads
 def watchdog_handler(log):
     log.kill("upload watchdog timer expired")
 
@@ -48,6 +54,7 @@ def parse_cli_arguments(conf, log):
     ap.add_argument("-c", "--config", help="configuration file")
     ap.add_argument("-a", "--address", help="server address")
     ap.add_argument("-p", "--port", help="server tcp port")
+    ap.add_argument("-s", "--sender", help="sender identification")
     ap.add_argument("-k", "--key", help="authentication key")
     ap.add_argument("-f", "--file", help="junit xml file")
     ap.add_argument("-l", "--log", help="log file")
@@ -58,6 +65,7 @@ def parse_cli_arguments(conf, log):
             "debug": "debug",
             "server_address": "address",
             "server_port": "port",
+            "sender_id": "sender",
             "auth_key": "key",
             "junit_xml": "file",
             "log_file": "log",
@@ -142,6 +150,10 @@ def main():
     # parse cli arguments
     parse_cli_arguments(conf, log)
 
+    # determine sender identification
+    determine_client_sender_id(conf)
+    log.info("identifying as sender {}".format(conf.sender_id))
+
     # start log buffer output
     log.info("writing to log file {}".format(conf.log_file))
     log.start()
@@ -159,15 +171,18 @@ def main():
 
     # get bamboo environment variables
     try:
-        plan = os.environ["bamboo_planKey"]
+        plan = str(os.environ["bamboo_planKey"])
+        log.debug("env[bamboo_planKey] = {} (str)".format(plan))
     except:
         log.abort("failed to get environment variable bamboo_planKey")
     try:
-        build = os.environ["bamboo_buildNumber"]
+        build = str(os.environ["bamboo_buildNumber"])
+        log.debug("env[bamboo_buildNumber] = {} (str)".format(build))
     except:
         log.abort("failed to get environment variable bamboo_buildNumber")
     try:
-        job = os.environ["bamboo_shortJobName"]
+        job = str(os.environ["bamboo_shortJobName"])
+        log.debug("env[bamboo_shortJobName] = {} (str)".format(job))
     except:
         log.abort("failed to get environment variable bamboo_shortJobName")
 
@@ -192,7 +207,9 @@ def main():
         if isinstance(suite, TestSuite):
             for case in suite:
                 results_total += 1
-                result = TopotestResult().from_case(case, suite, plan, build, job)
+                result = TopotestResult().from_case(
+                    case, conf.sender_id, plan, build, job
+                )
                 # check result
                 if not result.check():
                     results_invalid += 1
@@ -206,7 +223,7 @@ def main():
                 results_valid += 1
         elif isinstance(suite, TestCase):
             results_total += 1
-            result = TopotestResult().from_case(suite, None, plan, build, job)
+            result = TopotestResult().from_case(suite, conf.sender_id, plan, build, job)
             # check result
             if not result.check():
                 results_invalid += 1
@@ -296,6 +313,14 @@ def main():
     else:
         # nothing to do if no valid results
         log.info("no results to send")
+
+    # give some indication it all worked
+    if not conf.verbose and not conf.debug:
+        print(
+            "{}: sent {} valid results to server {}".format(
+                conf.progname, results_valid, conf.server_address
+            )
+        )
 
     # exit
     log.ok("terminating")

@@ -6,8 +6,8 @@ data message to the server. It depends on a few environment variables exported
 by bamboo-agent. The client resolves DNS server addresses to ipv4/ipv6 addresses
 before passing them to the ZeroMQ cython backend to prevent failures.
 ```
-usage: client.py [-h] [-v] [-d] [-c CONFIG] [-a ADDRESS] [-p PORT] [-k KEY]
-                 [-f FILE] [-l LOG]
+usage: client.py [-h] [-v] [-d] [-c CONFIG] [-a ADDRESS] [-p PORT] [-s SENDER]
+                 [-k KEY] [-f FILE] [-l LOG]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -18,6 +18,8 @@ optional arguments:
   -a ADDRESS, --address ADDRESS
                         server address
   -p PORT, --port PORT  server tcp port
+  -s SENDER, --sender SENDER
+                        sender identification
   -k KEY, --key KEY     authentication key
   -f FILE, --file FILE  junit xml file
   -l LOG, --log LOG     log file
