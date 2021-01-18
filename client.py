@@ -32,6 +32,7 @@ import zmq
 
 from lib.topostat import Logger, Message, TopotestResult, compose_zmq_client_address_str
 from lib.config import ClientConfig, read_config_file
+import lib.check as check
 
 
 # Upload watchdog handler to terminate non-responsive ZeroMQ connect and send threads
@@ -62,27 +63,55 @@ def parse_cli_arguments(conf, log):
             "log_file": "log",
         }
         for conf_var, arg_val in conf_to_args.items():
-            if args[arg_val] is not None:
-                if conf_var in conf.bools():
-                    if args[arg_val]:
-                        conf.__dict__[conf_var] = True
+            if not conf_var in conf.config_no_overwrite:
+                if not args[arg_val] is None:
+                    if conf_var in conf.config_lists:
+                        log.debug("configure list attempt conf.{}".format(conf_var))
+                    elif conf_var in conf.config_bools:
+                        if args[arg_val]:
+                            conf.__dict__[conf_var] = True
+                            if not conf_var in conf.config_no_show:
+                                log.debug(
+                                    "conf.{} = args[{}] = True (bool)".format(
+                                        conf_var, arg_val
+                                    )
+                                )
+                    elif conf_var in conf.config_ints:
+                        conf.__dict__[conf_var] = args[arg_val].getint()
+                        if conf_var in conf.config_no_show:
+                            log.debug(
+                                "conf.{} = args[{}] = *** (int)".format(
+                                    conf_var, arg_val
+                                )
+                            )
+                        else:
+                            log.debug(
+                                "conf.{} = args[{}] = {} (int)".format(
+                                    conf_var, arg_val, args[arg_val].getint()
+                                )
+                            )
+                    elif check.is_str_no_empty(args[arg_val]):
+                        conf.__dict__[conf_var] = args[arg_val]
+                        if conf_var in conf.config_no_show:
+                            log.debug(
+                                "conf.{} = args[{}] = *** (str)".format(
+                                    conf_var, arg_val
+                                )
+                            )
+                        else:
+                            log.debug(
+                                "conf.{} = args[{}] = {} (str)".format(
+                                    conf_var, arg_val, args[arg_val]
+                                )
+                            )
+                    else:
                         log.debug(
-                            "conf.{} = args[{}] = True (boolean)".format(
-                                conf_var, arg_val
+                            "args[{}] type invalid {}".format(
+                                arg_val, type(args[arg_val])
                             )
                         )
-                elif conf_var == "auth_key":
-                    conf.__dict__[conf_var] = args[arg_val]
-                    log.debug(
-                        "conf.{} = args[{}] = ***auth_key***".format(conf_var, arg_val)
-                    )
-                else:
-                    conf.__dict__[conf_var] = args[arg_val]
-                    log.debug(
-                        "conf.{} = args[{}] = {}".format(
-                            conf_var, arg_val, args[arg_val]
-                        )
-                    )
+            else:
+                log.debug("overwrite attempt conf.{}".format(conf_var))
     except:
         log.abort("failed to parse arguments")
 
@@ -116,6 +145,17 @@ def main():
     # start log buffer output
     log.info("writing to log file {}".format(conf.log_file))
     log.start()
+
+    # do a configuration check
+    if not conf.check():
+        log.abort("configuration check failed")
+    else:
+        log.info("passed configuration check")
+
+    # make sure watchdog timeout is positive non-zero value
+    if not check.is_int_min(conf.connection_timeout, 1):
+        log.debug("conf.connection_timeout = {}".format(conf.connection_timeout))
+        log.abort("upload watchdog timeout value is invalid")
 
     # get bamboo environment variables
     try:

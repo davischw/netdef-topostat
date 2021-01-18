@@ -34,6 +34,7 @@ import socket
 from junitparser import Failure, Skipped, Element, TestSuite, TestCase
 
 from lib.config import ServerConfig, ClientConfig
+import lib.check as check
 
 
 TOPOSTAT_MESSAGE_VERSION = 1
@@ -327,7 +328,7 @@ class Logger:
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
         try:
             self.buffer.put(
-                ["log", timestamp + " " + str(self.conf.progname) + " " + str(msg)]
+                ["log", timestamp + " " + self.conf.progname + " " + str(msg)]
             )
         except:
             pass
@@ -372,7 +373,7 @@ class Logger:
 def compose_zmq_client_address_str(conf, log):
     server_address_types = ["IPV4", "IPV6", "DNS"]
 
-    if conf.server_address_type is None:
+    if not check.is_str_no_empty(conf.server_address_type):
         if ":" in conf.server_address:
             conf.server_address_type = "IPV6"
         elif re.match(r"^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$", conf.server_address):
