@@ -150,14 +150,14 @@ class TopotestResult:
             + "name, result, time, host, timestamp, plan, build, job"
             + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (
-                self.name,
-                self.result,
-                self.time,
-                self.host,
-                self.timestamp,
-                self.plan,
-                self.build,
-                self.job,
+                str(self.name),
+                str(self.result),
+                str(self.time),
+                str(self.host),
+                str(self.timestamp),
+                str(self.plan),
+                str(self.build),
+                str(self.job),
             ),
         )
         conn.commit()
@@ -179,9 +179,11 @@ class TopotestResult:
             self.plan = json_dict["plan"]
             self.build = json_dict["build"]
             self.job = json_dict["job"]
-            return self
         except:
             return None
+        if not self.check():
+            return None
+        return self
 
     def from_case(self, case, suite, plan, build, job):
         if case is None:
@@ -216,7 +218,10 @@ class TopotestResult:
         else:
             if not isinstance(suite, TestSuite):
                 return None
-            self.host = str(suite.hostname)
+            if check.is_str_no_empty(suite.hostname):
+                self.host = suite.hostname
+            else:
+                self.host = socket.gethostname()
             self.timestamp = str(suite.timestamp).replace("T", " ")
 
         self.plan = str(plan)
@@ -231,7 +236,7 @@ class TopotestResult:
             elif isinstance(var, int):
                 continue
             elif isinstance(var, str):
-                if var == "":
+                if var == "" or var == "None":
                     return False
                 continue
             else:
