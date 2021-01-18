@@ -220,7 +220,7 @@ def main():
             break
         if arg in ("-c", "--config"):
             conf.config_file = sys.argv[sys.argv.index(arg) + 1]
-    if conf.config_file is not None:
+    if check.is_str_no_empty(conf.config_file):
         read_config_file(conf.config_file, conf, log)
     elif os.path.isfile(conf.default_config_file):
         read_config_file(conf.default_config_file, conf, log)
