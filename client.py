@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""NetDEF FRR Topotest Results Statistics Tool Client"""
 
 
 #
@@ -21,110 +22,110 @@
 #
 
 
+# standard library imports
 import os
 import sys
 import argparse
 from threading import Timer
+import socket
 
+# third party library imports
 from junitparser import JUnitXml, TestSuite, TestCase
 import zmq
 
-from lib.topostat import (
-    Logger,
-    Message,
-    TopotestResult,
-    compose_zmq_client_address_str,
-    determine_client_sender_id,
+# proprietary library imports
+from lib.logger import Logger
+from lib.message import Message
+from lib.topotestresult import TopotestResult_v2
+from lib.zmqutils import compose_zmq_client_address_str
+from lib.config import ClientConfig, read_config_file, read_config_from_cli_args
+from lib.check import is_int_min, is_str_no_empty, is_str_empty
+from lib.sysinfo import (
+    linux_kernel_version_str,
+    linux_architecture_str,
+    linux_distribution_version_str,
 )
-from lib.config import ClientConfig, read_config_file
-import lib.check as check
 
 
-# Upload watchdog handler to terminate non-responsive ZeroMQ connect and send
-# threads
 def watchdog_handler(log):
+    """
+    upload watchdog handler to terminate non-responsive ZeroMQ connect and send
+    threads
+    """
+
     log.kill("upload watchdog timer expired")
 
 
-# parse cli arguments
 def parse_cli_arguments(conf, log):
-    ap = argparse.ArgumentParser()
-    ap.add_argument("-v", "--verbose", help="verbose output", action="store_true")
-    ap.add_argument("-d", "--debug", help="debug messages", action="store_true")
-    ap.add_argument("-c", "--config", help="configuration file")
-    ap.add_argument("-a", "--address", help="server address")
-    ap.add_argument("-p", "--port", help="server tcp port")
-    ap.add_argument("-s", "--sender", help="sender identification")
-    ap.add_argument("-k", "--key", help="authentication key")
-    ap.add_argument("-f", "--file", help="junit xml file")
-    ap.add_argument("-l", "--log", help="log file")
+    """parses cli arguments"""
+
+    arg_parse = argparse.ArgumentParser()
+    arg_parse.add_argument(
+        "-v", "--verbose", help="verbose output", action="store_true"
+    )
+    arg_parse.add_argument("-d", "--debug", help="debug messages", action="store_true")
+    arg_parse.add_argument("-c", "--config", help="configuration file")
+    arg_parse.add_argument("-a", "--address", help="server address")
+    arg_parse.add_argument("-p", "--port", type=int, help="server tcp port")
+    arg_parse.add_argument("-s", "--sender", help="sender identification")
+    arg_parse.add_argument("-k", "--key", help="authentication key")
+    arg_parse.add_argument("-f", "--file", help="junit xml file")
+    arg_parse.add_argument("-l", "--log", help="log file")
+
+    conf_to_args_map = {
+        "verbose": "verbose",
+        "debug": "debug",
+        "server_address": "address",
+        "server_port": "port",
+        "sender_id": "sender",
+        "auth_key": "key",
+        "junit_xml": "file",
+        "log_file": "log",
+    }
+
     try:
-        args = vars(ap.parse_args())
-        conf_to_args = {
-            "verbose": "verbose",
-            "debug": "debug",
-            "server_address": "address",
-            "server_port": "port",
-            "sender_id": "sender",
-            "auth_key": "key",
-            "junit_xml": "file",
-            "log_file": "log",
-        }
-        for conf_var, arg_val in conf_to_args.items():
-            if not conf_var in conf.config_no_overwrite:
-                if not args[arg_val] is None:
-                    if conf_var in conf.config_lists:
-                        log.debug("configure list attempt conf.{}".format(conf_var))
-                    elif conf_var in conf.config_bools:
-                        if args[arg_val]:
-                            conf.__dict__[conf_var] = True
-                            if not conf_var in conf.config_no_show:
-                                log.debug(
-                                    "conf.{} = args[{}] = True (bool)".format(
-                                        conf_var, arg_val
-                                    )
-                                )
-                    elif conf_var in conf.config_ints:
-                        conf.__dict__[conf_var] = args[arg_val].getint()
-                        if conf_var in conf.config_no_show:
-                            log.debug(
-                                "conf.{} = args[{}] = *** (int)".format(
-                                    conf_var, arg_val
-                                )
-                            )
-                        else:
-                            log.debug(
-                                "conf.{} = args[{}] = {} (int)".format(
-                                    conf_var, arg_val, args[arg_val].getint()
-                                )
-                            )
-                    elif check.is_str_no_empty(args[arg_val]):
-                        conf.__dict__[conf_var] = args[arg_val]
-                        if conf_var in conf.config_no_show:
-                            log.debug(
-                                "conf.{} = args[{}] = *** (str)".format(
-                                    conf_var, arg_val
-                                )
-                            )
-                        else:
-                            log.debug(
-                                "conf.{} = args[{}] = {} (str)".format(
-                                    conf_var, arg_val, args[arg_val]
-                                )
-                            )
-                    else:
-                        log.debug(
-                            "args[{}] type invalid {}".format(
-                                arg_val, type(args[arg_val])
-                            )
-                        )
-            else:
-                log.debug("overwrite attempt conf.{}".format(conf_var))
-    except:
+        args = vars(arg_parse.parse_args())
+    except Exception:
         log.abort("failed to parse arguments")
+
+    try:
+        lcfca_ret = read_config_from_cli_args(args, conf, conf_to_args_map, log)
+    except Exception:
+        lcfca_ret = False
+
+    if lcfca_ret:
+        return True
+
+    log.abort("failed to write cli argument values to config variables")
+    return False  # abort is async!
+
+
+def determine_client_sender_id(conf):
+    """
+    Determine sender identification from either configured values or by
+    attempting to get the machines hostname. This process can fail due to weird
+    behaviour of python socket wrapper functions in connection with exotic
+    network stack configurations (LCX, Jails, etc.).
+    """
+
+    # check if sender identification is already configured
+    if is_str_no_empty(conf.sender_id) and conf.sender_id != "None":
+        return True
+
+    # otherwise use hostname
+    conf.sender_id = socket.gethostname()
+    if is_str_no_empty(conf.sender_id):
+        return True
+
+    # or cause the configuration check to abort the program, if
+    # socket.gethostname() fails
+    conf.sender_id = None
+    return False
 
 
 def main():
+    """client main function"""
+
     # initialize config
     conf = ClientConfig()
 
@@ -140,7 +141,7 @@ def main():
             break
         if arg in ("-c", "--config"):
             conf.config_file = sys.argv[sys.argv.index(arg) + 1]
-    if check.is_str_no_empty(conf.config_file):
+    if is_str_no_empty(conf.config_file):
         read_config_file(conf.config_file, conf, log)
     elif os.path.isfile(conf.default_config_file):
         read_config_file(conf.default_config_file, conf, log)
@@ -154,7 +155,7 @@ def main():
     determine_client_sender_id(conf)
     log.info("identifying as sender {}".format(conf.sender_id))
 
-    # start log buffer output
+    # start log buffer output (now we now which log file to write to)
     log.info("writing to log file {}".format(conf.log_file))
     log.start()
 
@@ -165,26 +166,49 @@ def main():
         log.info("passed configuration check")
 
     # make sure watchdog timeout is positive non-zero value
-    if not check.is_int_min(conf.connection_timeout, 1):
+    if not is_int_min(conf.connection_timeout, 1):
         log.debug("conf.connection_timeout = {}".format(conf.connection_timeout))
         log.abort("upload watchdog timeout value is invalid")
 
     # get bamboo environment variables
     try:
         plan = str(os.environ["bamboo_planKey"])
+        if is_str_empty(plan):
+            raise KeyError
         log.debug("env[bamboo_planKey] = {} (str)".format(plan))
-    except:
+    except KeyError:
         log.abort("failed to get environment variable bamboo_planKey")
     try:
-        build = str(os.environ["bamboo_buildNumber"])
-        log.debug("env[bamboo_buildNumber] = {} (str)".format(build))
-    except:
+        build = int(os.environ["bamboo_buildNumber"])
+        if not is_int_min(build, 1):
+            raise ValueError
+        log.debug("env[bamboo_buildNumber] = {} (int)".format(build))
+    except (KeyError, ValueError):
         log.abort("failed to get environment variable bamboo_buildNumber")
     try:
         job = str(os.environ["bamboo_shortJobName"])
+        if is_str_empty(job):
+            raise KeyError
         log.debug("env[bamboo_shortJobName] = {} (str)".format(job))
-    except:
+    except KeyError:
         log.abort("failed to get environment variable bamboo_shortJobName")
+
+    # get system information
+    sys_dist = linux_distribution_version_str()
+    if is_str_no_empty(sys_dist):
+        log.debug("sys_dist = {} (str)".format(sys_dist))
+    else:
+        log.abort("failed to get linux distribution name and release version")
+    sys_arch = linux_architecture_str()
+    if is_str_no_empty(sys_arch):
+        log.debug("sys_arch = {} (str)".format(sys_arch))
+    else:
+        log.abort("failed to get system architecure information")
+    sys_kvers = linux_kernel_version_str()
+    if is_str_no_empty(sys_kvers):
+        log.debug("sys_kvers = {} (str)".format(sys_kvers))
+    else:
+        log.abort("failed to get linux kernel version")
 
     # compose ZeroMQ server address string (includes DNS resolve)
     if compose_zmq_client_address_str(conf, log) is None:
@@ -207,34 +231,41 @@ def main():
         if isinstance(suite, TestSuite):
             for case in suite:
                 results_total += 1
-                result = TopotestResult().from_case(
-                    case, conf.sender_id, plan, build, job
+                result = TopotestResult_v2().from_case(
+                    case,
+                    conf.sender_id,
+                    plan,
+                    build,
+                    job,
+                    sys_dist,
+                    sys_arch,
+                    sys_kvers,
                 )
-                # check result
-                if not result.check():
+                if not result is None and result.check():
+                    # do not report if test was skipped
+                    if result.skipped():
+                        results_skipped += 1
+                        continue
+                    # append to results list
+                    results.append(result.json())
+                    results_valid += 1
+                else:
                     results_invalid += 1
-                    continue
+        elif isinstance(suite, TestCase):
+            results_total += 1
+            result = TopotestResult_v2().from_case(
+                case, conf.sender_id, plan, build, job, sys_dist, sys_arch, sys_kvers
+            )
+            if not result is None and result.check():
                 # do not report if test was skipped
                 if result.skipped():
                     results_skipped += 1
                     continue
                 # append to results list
-                results.append(result.to_json())
+                results.append(result.json())
                 results_valid += 1
-        elif isinstance(suite, TestCase):
-            results_total += 1
-            result = TopotestResult().from_case(suite, conf.sender_id, plan, build, job)
-            # check result
-            if not result.check():
+            else:
                 results_invalid += 1
-                continue
-            # do not report if test was skipped
-            if result.skipped():
-                results_skipped += 1
-                continue
-            # append to results list
-            results.append(result.to_json())
-            results_valid += 1
 
     log.info(
         "gathered {} test results ({} valid, {} skipped, {} invalid)".format(
@@ -279,7 +310,7 @@ def main():
                     conf.socket_address_str
                 )
             )
-        except:
+        except zmq.ZMQError:
             watchdog.cancel()
             sock.close()
             context.term()
@@ -291,7 +322,7 @@ def main():
 
         # send test results JSON data to server
         try:
-            sock.send_json(msg.to_json())
+            sock.send_json(msg.json())
             sock.close()
             context.term()
             log.info("sent {} topotest results to server".format(results_valid))
@@ -300,7 +331,7 @@ def main():
                     conf.socket_address_str
                 )
             )
-        except:
+        except zmq.ZMQError:
             watchdog.cancel()
             sock.close()
             context.term()
@@ -323,7 +354,7 @@ def main():
         )
 
     # exit
-    log.ok("terminating")
+    log.success("terminating")
     log.stop()
     sys.exit(0)
 
