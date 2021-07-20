@@ -1,0 +1,19 @@
+#!/bin/sh
+
+
+# export bamboo environment variables
+export bamboo_planKey="testPlanKey2"
+export bamboo_buildNumber=1337
+export bamboo_shortJobName="testShortJobName3"
+
+
+# start client
+python3 client.py \
+        --debug \
+        --config config/topostat.conf \
+        --address ::1 \
+        --port 5678 \
+        --sender test-client \
+        --key SuperSecretAuthenticationKey \
+        --file examples/junit.xml \
+        --log /tmp/test-client.log

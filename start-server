@@ -1,0 +1,13 @@
+#!/bin/sh
+
+
+# start client
+python3 server.py \
+        --debug \
+        --config config/topostat.conf \
+        --ipv6-address ::1 \
+        --ipv6-port 5678 \
+        --ipv4-address 127.0.0.1 \
+        --ipv4-port 5678 \
+        --key SuperSecretAuthenticationKey \
+        --log /tmp/test-server.log

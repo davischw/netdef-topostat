@@ -1,0 +1,325 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites><testsuite errors="0" failures="1" hostname="mininet-u1804-template" name="pytest" skipped="1" tests="20" time="19.533" timestamp="2021-03-15T08:58:22.983361"><testcase classname="all-protocol-startup.test_all_protocol_startup" file="all-protocol-startup/test_all_protocol_startup.py" line="148" name="test_router_running" time="7.233"><system-out>
+
+** test_all_protocol_startup: Setup Topology
+******************************************
+
+Cleanup old Mininet runs
+2021-03-15 08:58:24,759 INFO: r1: running version: 7.7-dev-20210314-01-ge319ed4c4
+
+
+** Check if FRR is running on each Router node
+******************************************
+
+</system-out></testcase><testcase classname="all-protocol-startup.test_all_protocol_startup" file="all-protocol-startup/test_all_protocol_startup.py" line="169" name="test_error_messages_vtysh" time="0.310"><system-out>
+
+** Check for error messages on VTYSH
+******************************************
+
+r1 StdOut ok
+r1 StdErr ok
+</system-out></testcase><testcase classname="all-protocol-startup.test_all_protocol_startup" file="all-protocol-startup/test_all_protocol_startup.py" line="225" name="test_error_messages_daemons" time="0.018"><system-out>
+
+** Check for error messages in daemons
+******************************************
+
+</system-out></testcase><testcase classname="all-protocol-startup.test_all_protocol_startup" file="all-protocol-startup/test_all_protocol_startup.py" line="316" name="test_converge_protocols" time="0.001"><skipped message="&lt;Skipped instance&gt;" type="pytest.skip">/root/frr-source/tests/topotests/all-protocol-startup/test_all_protocol_startup.py:321: &lt;Skipped instance&gt;</skipped><system-out>2021-03-15 08:58:30,646 INFO: assert skipped at &quot;test_all_protocol_startup/test_converge_protocols&quot;: &lt;Skipped instance&gt;
+</system-out></testcase><testcase classname="all-protocol-startup.test_all_protocol_startup" file="all-protocol-startup/test_all_protocol_startup.py" line="452" name="test_nexthop_groups" time="3.694"><system-out>
+
+** Verifying Nexthop Groups
+******************************************
+
+</system-out></testcase><testcase classname="all-protocol-startup.test_all_protocol_startup" file="all-protocol-startup/test_all_protocol_startup.py" line="554" name="test_rip_status" time="0.207"><system-out>
+
+** Verifying RIP status
+******************************************
+
+r1 ok
+</system-out></testcase><testcase classname="all-protocol-startup.test_all_protocol_startup" file="all-protocol-startup/test_all_protocol_startup.py" line="614" name="test_ripng_status" time="0.205"><system-out>
+
+** Verifying RIPng status
+******************************************
+
+r1 ok
+</system-out></testcase><testcase classname="all-protocol-startup.test_all_protocol_startup" file="all-protocol-startup/test_all_protocol_startup.py" line="681" name="test_ospfv2_interfaces" time="0.105"><failure message="AssertionError: SHOW IP OSPF INTERFACE failed for router r1:
+  --- actual SHOW IP OSPF INTERFACE
+  +++ expected SHOW IP OSPF INTERFACE
+  @@ -3,9 +3,9 @@
+     Internet Address 192.168.0.1/24, Broadcast 192.168.0.255, Area 0.0.0.0
+     MTU mismatch detection: enabled
+     Router ID 192.168.0.1, Network Type BROADCAST, Cost: 10
+  -  Transmit Delay is 1 sec, State Waiting, Priority 1
+  +  Transmit Delay is 1 sec, State DR, Priority 1
+     No backup designated router on this network
+  -  Multicast group memberships: OSPFAllRouters
+  +  Multicast group memberships: OSPFAllRouters OSPFDesignatedRouters
+     Timer intervals configured, Hello 10s, Dead 40s, Wait 40s, Retransmit 5
+       Hello due in XX.XXXs
+     Neighbor Count is 0, Adjacent neighbor count is 0
+  @@ -14,9 +14,9 @@
+     Internet Address 192.168.3.1/26, Broadcast 192.168.3.63, Area 0.0.0.0
+     MTU mismatch detection: enabled
+     Router ID 192.168.0.1, Network Type BROADCAST, Cost: 10
+  -  Transmit Delay is 1 sec, State Waiting, Priority 1
+  +  Transmit Delay is 1 sec, State DR, Priority 1
+     No backup designated router on this network
+  -  Multicast group memberships: OSPFAllRouters
+  +  Multicast group memberships: OSPFAllRouters OSPFDesignatedRouters
+     Timer intervals configured, Hello 10s, Dead 40s, Wait 40s, Retransmit 5
+       Hello due in XX.XXXs
+     Neighbor Count is 0, Adjacent neighbor count is 0
+assert 1 == 0
+  -1
+  +0">def test_ospfv2_interfaces():
+        global fatal_error
+        global net
+    
+        # Skip if previous fatal error condition is raised
+        if fatal_error != &quot;&quot;:
+            pytest.skip(fatal_error)
+    
+        thisDir = os.path.dirname(os.path.realpath(__file__))
+    
+        print(&quot;\n\n** Verifying OSPFv2 interfaces&quot;)
+        print(&quot;******************************************\n&quot;)
+        failures = 0
+        for i in range(1, 2):
+            refTableFile = &quot;%s/r%s/show_ip_ospf_interface.ref&quot; % (thisDir, i)
+            if os.path.isfile(refTableFile):
+                # Read expected result from file
+                expected = open(refTableFile).read().rstrip()
+                # Fix newlines (make them all the same)
+                expected = (&quot;\n&quot;.join(expected.splitlines()) + &quot;\n&quot;).splitlines(1)
+    
+                # Actual output from router
+                actual = (
+                    net[&quot;r%s&quot; % i]
+                    .cmd(&apos;vtysh -c &quot;show ip ospf interface&quot; 2&gt; /dev/null&apos;)
+                    .rstrip()
+                )
+                # Mask out Bandwidth portion. They may change..
+                actual = re.sub(r&quot;BW [0-9]+ Mbit&quot;, &quot;BW XX Mbit&quot;, actual)
+                actual = re.sub(r&quot;ifindex [0-9]&quot;, &quot;ifindex X&quot;, actual)
+    
+                # Drop time in next due
+                actual = re.sub(r&quot;Hello due in [0-9\.]+s&quot;, &quot;Hello due in XX.XXXs&quot;, actual)
+                actual = re.sub(
+                    r&quot;Hello due in [0-9\.]+ usecs&quot;, &quot;Hello due in XX.XXXs&quot;, actual
+                )
+                # Fix &apos;MTU mismatch detection: enabled&apos; vs &apos;MTU mismatch detection:enabled&apos; - accept both
+                actual = re.sub(
+                    r&quot;MTU mismatch detection:([a-z]+.*)&quot;,
+                    r&quot;MTU mismatch detection: \1&quot;,
+                    actual,
+                )
+                # Fix newlines (make them all the same)
+                actual = (&quot;\n&quot;.join(actual.splitlines()) + &quot;\n&quot;).splitlines(1)
+    
+                # Generate Diff
+                diff = topotest.get_textdiff(
+                    actual,
+                    expected,
+                    title1=&quot;actual SHOW IP OSPF INTERFACE&quot;,
+                    title2=&quot;expected SHOW IP OSPF INTERFACE&quot;,
+                )
+    
+                # Empty string if it matches, otherwise diff contains unified diff
+                if diff:
+                    sys.stderr.write(
+                        &quot;r%s failed SHOW IP OSPF INTERFACE check:\n%s\n&quot; % (i, diff)
+                    )
+                    failures += 1
+                else:
+                    print(&quot;r%s ok&quot; % i)
+    
+                # Ignoring the issue if told to ignore (ie not yet fixed)
+                if failures != 0:
+                    if os.environ.get(&quot;bamboo_TOPOTESTS_ISSUE_348&quot;) == &quot;IGNORE&quot;:
+                        sys.stderr.write(
+                            &quot;Known issue - IGNORING. See https://github.com/FRRouting/frr/issues/348\n&quot;
+                        )
+                        pytest.skip(
+                            &quot;Known issue - IGNORING. See https://github.com/FRRouting/frr/issues/348&quot;
+                        )
+    
+&gt;               assert (
+                    failures == 0
+                ), &quot;SHOW IP OSPF INTERFACE failed for router r%s:\n%s&quot; % (i, diff)
+E               AssertionError: SHOW IP OSPF INTERFACE failed for router r1:
+E                 --- actual SHOW IP OSPF INTERFACE
+E                 +++ expected SHOW IP OSPF INTERFACE
+E                 @@ -3,9 +3,9 @@
+E                    Internet Address 192.168.0.1/24, Broadcast 192.168.0.255, Area 0.0.0.0
+E                    MTU mismatch detection: enabled
+E                    Router ID 192.168.0.1, Network Type BROADCAST, Cost: 10
+E                 -  Transmit Delay is 1 sec, State Waiting, Priority 1
+E                 +  Transmit Delay is 1 sec, State DR, Priority 1
+E                    No backup designated router on this network
+E                 -  Multicast group memberships: OSPFAllRouters
+E                 +  Multicast group memberships: OSPFAllRouters OSPFDesignatedRouters
+E                    Timer intervals configured, Hello 10s, Dead 40s, Wait 40s, Retransmit 5
+E                      Hello due in XX.XXXs
+E                    Neighbor Count is 0, Adjacent neighbor count is 0
+E                 @@ -14,9 +14,9 @@
+E                    Internet Address 192.168.3.1/26, Broadcast 192.168.3.63, Area 0.0.0.0
+E                    MTU mismatch detection: enabled
+E                    Router ID 192.168.0.1, Network Type BROADCAST, Cost: 10
+E                 -  Transmit Delay is 1 sec, State Waiting, Priority 1
+E                 +  Transmit Delay is 1 sec, State DR, Priority 1
+E                    No backup designated router on this network
+E                 -  Multicast group memberships: OSPFAllRouters
+E                 +  Multicast group memberships: OSPFAllRouters OSPFDesignatedRouters
+E                    Timer intervals configured, Hello 10s, Dead 40s, Wait 40s, Retransmit 5
+E                      Hello due in XX.XXXs
+E                    Neighbor Count is 0, Adjacent neighbor count is 0
+E               assert 1 == 0
+E                 -1
+E                 +0
+
+test_all_protocol_startup.py:754: AssertionError</failure><system-out>
+
+** Verifying OSPFv2 interfaces
+******************************************
+
+</system-out><system-err>r1 failed SHOW IP OSPF INTERFACE check:
+--- actual SHOW IP OSPF INTERFACE
++++ expected SHOW IP OSPF INTERFACE
+@@ -3,9 +3,9 @@
+   Internet Address 192.168.0.1/24, Broadcast 192.168.0.255, Area 0.0.0.0
+   MTU mismatch detection: enabled
+   Router ID 192.168.0.1, Network Type BROADCAST, Cost: 10
+-  Transmit Delay is 1 sec, State Waiting, Priority 1
++  Transmit Delay is 1 sec, State DR, Priority 1
+   No backup designated router on this network
+-  Multicast group memberships: OSPFAllRouters
++  Multicast group memberships: OSPFAllRouters OSPFDesignatedRouters
+   Timer intervals configured, Hello 10s, Dead 40s, Wait 40s, Retransmit 5
+     Hello due in XX.XXXs
+   Neighbor Count is 0, Adjacent neighbor count is 0
+@@ -14,9 +14,9 @@
+   Internet Address 192.168.3.1/26, Broadcast 192.168.3.63, Area 0.0.0.0
+   MTU mismatch detection: enabled
+   Router ID 192.168.0.1, Network Type BROADCAST, Cost: 10
+-  Transmit Delay is 1 sec, State Waiting, Priority 1
++  Transmit Delay is 1 sec, State DR, Priority 1
+   No backup designated router on this network
+-  Multicast group memberships: OSPFAllRouters
++  Multicast group memberships: OSPFAllRouters OSPFDesignatedRouters
+   Timer intervals configured, Hello 10s, Dead 40s, Wait 40s, Retransmit 5
+     Hello due in XX.XXXs
+   Neighbor Count is 0, Adjacent neighbor count is 0
+2021-03-15 08:58:34,865 ERROR: assert failed at &quot;test_all_protocol_startup/test_ospfv2_interfaces&quot;: SHOW IP OSPF INTERFACE failed for router r1:
+  --- actual SHOW IP OSPF INTERFACE
+  +++ expected SHOW IP OSPF INTERFACE
+  @@ -3,9 +3,9 @@
+     Internet Address 192.168.0.1/24, Broadcast 192.168.0.255, Area 0.0.0.0
+     MTU mismatch detection: enabled
+     Router ID 192.168.0.1, Network Type BROADCAST, Cost: 10
+  -  Transmit Delay is 1 sec, State Waiting, Priority 1
+  +  Transmit Delay is 1 sec, State DR, Priority 1
+     No backup designated router on this network
+  -  Multicast group memberships: OSPFAllRouters
+  +  Multicast group memberships: OSPFAllRouters OSPFDesignatedRouters
+     Timer intervals configured, Hello 10s, Dead 40s, Wait 40s, Retransmit 5
+       Hello due in XX.XXXs
+     Neighbor Count is 0, Adjacent neighbor count is 0
+  @@ -14,9 +14,9 @@
+     Internet Address 192.168.3.1/26, Broadcast 192.168.3.63, Area 0.0.0.0
+     MTU mismatch detection: enabled
+     Router ID 192.168.0.1, Network Type BROADCAST, Cost: 10
+  -  Transmit Delay is 1 sec, State Waiting, Priority 1
+  +  Transmit Delay is 1 sec, State DR, Priority 1
+     No backup designated router on this network
+  -  Multicast group memberships: OSPFAllRouters
+  +  Multicast group memberships: OSPFAllRouters OSPFDesignatedRouters
+     Timer intervals configured, Hello 10s, Dead 40s, Wait 40s, Retransmit 5
+       Hello due in XX.XXXs
+     Neighbor Count is 0, Adjacent neighbor count is 0
+assert 1 == 0
+  -1
+  +0
+</system-err></testcase><testcase classname="all-protocol-startup.test_all_protocol_startup" file="all-protocol-startup/test_all_protocol_startup.py" line="766" name="test_isis_interfaces" time="0.210"><system-out>
+
+** Verifying ISIS interfaces
+******************************************
+
+r1 ok
+</system-out></testcase><testcase classname="all-protocol-startup.test_all_protocol_startup" file="all-protocol-startup/test_all_protocol_startup.py" line="832" name="test_bgp_summary" time="0.208"><system-out>
+
+** Verifying BGP Summary
+******************************************
+
+r1 ok
+</system-out></testcase><testcase classname="all-protocol-startup.test_all_protocol_startup" file="all-protocol-startup/test_all_protocol_startup.py" line="927" name="test_bgp_ipv6_summary" time="0.209"><system-out>
+
+** Verifying BGP IPv6 Summary
+******************************************
+
+r1 ok
+</system-out></testcase><testcase classname="all-protocol-startup.test_all_protocol_startup" file="all-protocol-startup/test_all_protocol_startup.py" line="1023" name="test_nht" time="0.207"><system-out>
+
+**** Test that nexthop tracking is at least nominally working ****
+
+show ip nht is ok
+
+show ipv6 nht is ok
+
+</system-out></testcase><testcase classname="all-protocol-startup.test_all_protocol_startup" file="all-protocol-startup/test_all_protocol_startup.py" line="1070" name="test_bgp_ipv4" time="0.508"><system-out>
+
+** Verifying BGP IPv4
+******************************************
+
+template /root/frr-source/tests/topotests/all-protocol-startup/r1/show_bgp_ipv4-post6.1.ref matched: r1 ok
+</system-out></testcase><testcase classname="all-protocol-startup.test_all_protocol_startup" file="all-protocol-startup/test_all_protocol_startup.py" line="1140" name="test_bgp_ipv6" time="0.558"><system-out>
+
+** Verifying BGP IPv6
+******************************************
+
+template /root/frr-source/tests/topotests/all-protocol-startup/r1/show_bgp_ipv6_post6.1.ref matched: r1 ok
+</system-out></testcase><testcase classname="all-protocol-startup.test_all_protocol_startup" file="all-protocol-startup/test_all_protocol_startup.py" line="1209" name="test_route_map" time="0.104"><system-out>
+
+** Verifying some basic routemap forward references
+
+*******************************************************
+
+r1 ok
+</system-out></testcase><testcase classname="all-protocol-startup.test_all_protocol_startup" file="all-protocol-startup/test_all_protocol_startup.py" line="1252" name="test_nexthop_groups_with_route_maps" time="2.876"><system-out>
+
+** Verifying Nexthop Groups With Route-Maps
+******************************************
+
+</system-out></testcase><testcase classname="all-protocol-startup.test_all_protocol_startup" file="all-protocol-startup/test_all_protocol_startup.py" line="1349" name="test_nexthop_group_replace" time="0.718"><system-out>
+
+** Verifying Nexthop Groups
+******************************************
+
+</system-out></testcase><testcase classname="all-protocol-startup.test_all_protocol_startup" file="all-protocol-startup/test_all_protocol_startup.py" line="1382" name="test_mpls_interfaces" time="0.205"><system-out>
+
+** Verifying MPLS Interfaces
+******************************************
+
+r1 ok
+</system-out></testcase><testcase classname="all-protocol-startup.test_all_protocol_startup" file="all-protocol-startup/test_all_protocol_startup.py" line="1451" name="test_shutdown_check_stderr" time="0.112"><system-out>
+
+** Verifying unexpected STDERR output from daemons
+******************************************
+
+thisDir=/root/frr-source/tests/topotests/all-protocol-startup
+2021-03-15 08:58:40,724 INFO: r1: stopping babeld
+2021-03-15 08:58:40,725 INFO: r1: stopping bgpd
+2021-03-15 08:58:40,727 INFO: r1: stopping isisd
+2021-03-15 08:58:40,738 INFO: r1: stopping ldpd
+2021-03-15 08:58:40,747 INFO: r1: stopping nhrpd
+2021-03-15 08:58:40,750 INFO: r1: stopping ospf6d
+2021-03-15 08:58:40,755 INFO: r1: stopping ospfd
+2021-03-15 08:58:40,757 INFO: r1: stopping pbrd
+2021-03-15 08:58:40,761 INFO: r1: stopping ripd
+2021-03-15 08:58:40,765 INFO: r1: stopping ripngd
+2021-03-15 08:58:40,768 INFO: r1: stopping sharpd
+2021-03-15 08:58:40,772 INFO: r1: stopping staticd
+2021-03-15 08:58:40,776 INFO: r1: stopping zebra
+</system-out></testcase><testcase classname="all-protocol-startup.test_all_protocol_startup" file="all-protocol-startup/test_all_protocol_startup.py" line="1514" name="test_shutdown_check_memleak" time="1.679"><system-out>
+
+** test_all_protocol_startup: Shutdown Topology
+******************************************
+
+</system-out></testcase></testsuite></testsuites>

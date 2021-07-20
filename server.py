@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""NetDEF FRR Topotest Results Statistics Tool Server"""
 
 
 #
@@ -21,21 +22,34 @@
 #
 
 
+# standard library imports
 import os
 import sys
 import signal
 import argparse
-import sqlite3
 
+# third party library imports
 import zmq
+from sqlalchemy.exc import SQLAlchemyError
 
-from lib.topostat import Logger, Message, TopotestResult
-from lib.config import ServerConfig, read_config_file
-import lib.check as check
+# proprietary library imports
+from lib.logger import Logger
+from lib.message import Message
+from lib.topotestresult import TopotestResult
+from lib.config import (
+    ServerConfig,
+    DatabaseConfig,
+    read_config_file,
+    read_config_from_cli_args,
+)
+from lib.check import is_str_no_empty
+from lib.database import Database
+from lib.dbutils import topotestresult_to_result
 
 
 # process received results and store results in database
-def process_received_results(results, conn, conf, log):
+# TODO: [code] remove print statments
+def process_received_results(results: list, database: Database, log: Logger):
 
     # check if received json payload is a list
     if not isinstance(results, list):
@@ -54,31 +68,41 @@ def process_received_results(results, conn, conf, log):
     for json_obj in results:
         results_total += 1
 
-        # convert to TopotestResult object
+        # convert json to TopotestResult object
         try:
-            result = TopotestResult().from_json(json_obj)
+            ttr = TopotestResult().from_json(json_obj)
         except:
+            print("debug_1337: ttr.from_json")
             results_invalid += 1
             continue
+
+        # convert json to TopotestResult object to Result datasbe object
+        # TODO: [code] wrap in try except
+        result = topotestresult_to_result(ttr, database)
+
         if result is None:
+            print("debug_1338: topotestresult_to_result")
             results_invalid += 1
             continue
 
         # check integrity of converted object
         if result.check():
             results_valid += 1
-            agent = result.host
+            agent = result.agent.name
 
             # insert result into database
             try:
-                result.insert_into(conn, conf.results_table)
-            except:
+                database.session.add(result)
+                database.session.commit()
+            except SQLAlchemyError:
+                print("debug_1340: insertion")
                 log.err(
-                    "failed to insert results into table {} in database {}".format(
-                        conf.results_table, conf.sqlite3_db
+                    "failed to insert results into database {}".format(
+                        database.conf.database_str
                     )
                 )
         else:
+            print("debug_1339: result.check")
             results_invalid += 1
 
     if results_valid > 0:
@@ -111,82 +135,45 @@ def parse_cli_arguments(conf, log):
     ap.add_argument("-a4", "--ipv4-address", help="server ipv4 address")
     ap.add_argument("-p4", "--ipv4-port", help="server ipv4 tcp port")
     ap.add_argument("-k", "--key", help="authentication key")
-    ap.add_argument("-b", "--database", help="sqlite3 database file")
     ap.add_argument("-l", "--log", help="log file")
+
+    conf_to_args_map = {
+        "verbose": "verbose",
+        "debug": "debug",
+        "config_file": "config",
+        "server_no_ipv6": "no_ipv6",
+        "server_address_ipv6": "ipv6_address",
+        "server_port_ipv6": "ipv6_port",
+        "server_no_ipv4": "no_ipv4",
+        "server_address_ipv4": "ipv4_address",
+        "server_port_ipv4": "ipv4_port",
+        "auth_key": "key",
+        "log_file": "log",
+    }
 
     try:
         args = vars(ap.parse_args())
-        conf_to_args = {
-            "verbose": "verbose",
-            "debug": "debug",
-            "config_file": "config",
-            "server_no_ipv6": "no_ipv6",
-            "server_address_ipv6": "ipv6_address",
-            "server_port_ipv6": "ipv6_port",
-            "server_no_ipv4": "no_ipv4",
-            "server_address_ipv4": "ipv4_address",
-            "server_port_ipv4": "ipv4_port",
-            "auth_key": "key",
-            "sqlite3_db": "database",
-            "log_file": "log",
-        }
-        for conf_var, arg_val in conf_to_args.items():
-            if not conf_var in conf.config_no_overwrite:
-                if not args[arg_val] is None:
-                    if conf_var in conf.config_lists:
-                        log.debug("configure list attempt conf.{}".format(conf_var))
-                    elif conf_var in conf.config_bools:
-                        if args[arg_val]:
-                            conf.__dict__[conf_var] = True
-                            if not conf_var in conf.config_no_show:
-                                log.debug(
-                                    "conf.{} = args[{}] = True (bool)".format(
-                                        conf_var, arg_val
-                                    )
-                                )
-                    elif conf_var in conf.config_ints:
-                        conf.__dict__[conf_var] = args[arg_val].getint()
-                        if conf_var in conf.config_no_show:
-                            log.debug(
-                                "conf.{} = args[{}] = *** (int)".format(
-                                    conf_var, arg_val
-                                )
-                            )
-                        else:
-                            log.debug(
-                                "conf.{} = args[{}] = {} (int)".format(
-                                    conf_var, arg_val, args[arg_val].getint()
-                                )
-                            )
-                    elif check.is_str_no_empty(args[arg_val]):
-                        conf.__dict__[conf_var] = args[arg_val]
-                        if conf_var in conf.config_no_show:
-                            log.debug(
-                                "conf.{} = args[{}] = *** (str)".format(
-                                    conf_var, arg_val
-                                )
-                            )
-                        else:
-                            log.debug(
-                                "conf.{} = args[{}] = {} (str)".format(
-                                    conf_var, arg_val, args[arg_val]
-                                )
-                            )
-                    else:
-                        log.debug(
-                            "args[{}] type invalid {}".format(
-                                arg_val, type(args[arg_val])
-                            )
-                        )
-            else:
-                log.debug("overwrite attempt conf.{}".format(conf_var))
     except:
         log.abort("failed to parse arguments")
 
+    try:
+        lcfca_ret = read_config_from_cli_args(args, conf, conf_to_args_map, log)
+    except:
+        lcfca_ret = False
+
+    if lcfca_ret:
+        return True
+
+    log.abort("failed to write cli argument values to config variables")
+    return False  # abort is async!
+
 
 def main():
-    # initialize config
+    """server main function"""
+
+    # initialize configs
     conf = ServerConfig()
+    db_conf = DatabaseConfig()
 
     # initialize logger
     log = Logger(conf)
@@ -220,23 +207,27 @@ def main():
             break
         if arg in ("-c", "--config"):
             conf.config_file = sys.argv[sys.argv.index(arg) + 1]
-    if check.is_str_no_empty(conf.config_file):
+    if is_str_no_empty(conf.config_file):
         read_config_file(conf.config_file, conf, log)
+        read_config_file(conf.config_file, db_conf, log)
     elif os.path.isfile(conf.default_config_file):
         read_config_file(conf.default_config_file, conf, log)
+        read_config_file(conf.config_file, db_conf, log)
     else:
         log.warn("running with potentially unsafe default configuration")
 
     # parse cli arguments
     parse_cli_arguments(conf, log)
 
-    # start log buffer output
+    # start log buffer output (now we now which log file to write to)
     log.info("writing to log file {}".format(conf.log_file))
     log.start()
 
     # do a configuration check
     if not conf.check():
         log.abort("configuration check failed")
+    elif not db_conf.check():
+        log.abort("database configuration check failed")
     else:
         log.info("passed configuration check")
 
@@ -259,44 +250,20 @@ def main():
                 "conf.socket_address_ipv6_str = {}".format(conf.socket_address_ipv6_str)
             )
 
-    # connect to sqlite3 db
-    try:
-        conn = sqlite3.connect(conf.sqlite3_db)
-        db = conn.cursor()
-    except:
-        log.abort("failed to connect to database {}".format(conf.sqlite3_db))
+    # create database instance
+    db = Database()
 
-    # create results table if it does not exist
-    try:
-        db.execute(
-            "SELECT count(name) FROM sqlite_master WHERE type='table' AND name='{}'".format(
-                conf.results_table
-            )
-        )
-    except:
-        log.abort(
-            "unable to query if table {} exists in database {}".format(
-                conf.results_table, conf.sqlite3_db
-            )
-        )
-    if db.fetchone()[0] == 0:
-        try:
-            TopotestResult().create_table(conn, conf.results_table)
-            log.info(
-                "created table {} in database {}".format(
-                    conf.results_table, conf.sqlite3_db
-                )
-            )
-        except:
-            conn.close()
-            log.abort(
-                "failed to create table {} in database {}".format(
-                    conf.results_table, conf.sqlite3_db
-                )
-            )
-    log.info(
-        "using table {} in database {}".format(conf.results_table, conf.sqlite3_db)
-    )
+    # apply database configuration
+    if db.apply_config(db_conf):
+        log.info("applied database configuration")
+    else:
+        log.abort("failed to apply database configuration")
+
+    # connect to database
+    if db.connect():
+        log.info("connected to database {}".format(db.conf.database_str))
+    else:
+        log.abort("failed to connect to database")
 
     # create ZeroMQ contexts and bind to sockets
     if not conf.server_no_ipv6:
@@ -312,7 +279,7 @@ def main():
                 )
             )
         except:
-            conn.close()
+            db.close()
             log.abort(
                 "failed to bind ZeroMQ PULL ipv6 socket to address {}".format(
                     conf.socket_address_ipv6_str
@@ -330,7 +297,7 @@ def main():
                 )
             )
         except:
-            conn.close()
+            db.close()
             log.abort(
                 "failed to bind ZeroMQ PULL ipv4 socket to address {}".format(
                     conf.socket_address_ipv4_str
@@ -352,7 +319,7 @@ def main():
                     break
                 except TerminationSignalReceived:
                     break
-                except:
+                except Exception:
                     pass
             if not conf.server_no_ipv4:
                 json_msg = None
@@ -361,26 +328,26 @@ def main():
                     break
                 except TerminationSignalReceived:
                     break
-                except:
+                except Exception:
                     pass
 
-        if json_msg is None:
+        if conf.run and json_msg is None:
             log.warn("failed to receive ZeroMQ message")
             continue
 
         # parse received message
-        msg = Message()
-        try:
-            msg.from_json(json_msg)
-            if not msg.check_auth(conf.auth_key):
-                log.warn("failed to authenticate ZeroMQ message")
+        if conf.run:
+            msg = Message()
+            try:
+                msg.from_json(json_msg)
+                if not msg.check_auth(conf.auth_key):
+                    log.warn("failed to authenticate ZeroMQ message")
+                    continue
+            except:
+                log.warn("failed to parse ZeroMQ message")
                 continue
-        except:
-            log.warn("failed to parse ZeroMQ message")
-            continue
-
-        # process received test results
-        process_received_results(msg.payload, conn, conf, log)
+            # process received test results
+            process_received_results(msg.payload, db, log)
 
     # closing sockets and terminating ZeroMQ contexts
     if not conf.server_no_ipv6:
@@ -401,11 +368,11 @@ def main():
         )
 
     # closing database connection
-    conn.close()
-    log.info("closed connection to database {}".format(conf.sqlite3_db))
+    db.close()
+    log.info("closed connection to database {}".format(db.conf.database_str))
 
     # exit
-    log.ok("terminating")
+    log.success("terminating")
     log.stop()
     sys.exit(0)
 

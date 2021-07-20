@@ -76,6 +76,8 @@ python3 -m pip install -U pip
 python3 -m pip install pyzmq
 python3 -m pip install junitparser
 python3 -m pip install pysqlite3
+python3 -m pip install pymysql
+python3 -m pip install psycopg2
 ```
 
 #### clone code from git repo
@@ -146,6 +148,6 @@ The client depends on a few environment variables exported by bamboo agent. For
 testing and debugging purposes they can be exported before starting the client:
 ```
 export bamboo_planKey="testPlanKey"
-export bamboo_buildNumber="testBuildNumber"
+export bamboo_buildNumber=1337
 export bamboo_shortJobName="testShortJobName"
 ```

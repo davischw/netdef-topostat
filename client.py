@@ -260,7 +260,9 @@ def main():
                 # do not report if test was skipped
                 if result.skipped():
                     results_skipped += 1
-                    continue
+                    # TODO: [code] compatibility with server for recording
+                    #              skipped tests results
+                    #continue
                 # append to results list
                 results.append(result.json())
                 results_valid += 1
@@ -286,6 +288,7 @@ def main():
         if not msg.check():
             log.abort("check of composed topostat message failed")
         log.info("composed topostat message")
+        log.debug("msg = {}".format(msg.json()))
 
         # create ZeroMQ context and socket
         context = zmq.Context()
