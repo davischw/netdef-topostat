@@ -28,6 +28,8 @@ from lib.olddbstuff import topotestresult_from_sql_tuple
 
 TOPOSTAT_DATABASE = "/home/davischw/topotests.db"
 TOPOSTAT_TESTRESULTS_TABLE = "testresults"
+CI_URL_BROWSE = "https://ci1.netdef.org/browse"
+
 
 IDX_ID = 0
 IDX_NAME = 1
@@ -196,6 +198,9 @@ def result_process_module_and_append_to_stats_list(result, stats_list):
 
 
 def generate_txt_report(
+    conf,
+    log,
+    results,
     database_name,
     total_results,
     total_weekly,
@@ -208,7 +213,10 @@ def generate_txt_report(
     job_stats,
 ):
     if (
-        is_str_no_empty(database_name)
+        isinstance(conf, StatsConfig)
+        and isinstance(log, Logger)
+        and isinstance(results, list)
+        and is_str_no_empty(database_name)
         and is_int_min(total_results, 0)
         and is_int_min(total_weekly, 0)
         and is_datetime(week_dt)
@@ -220,8 +228,8 @@ def generate_txt_report(
         and is_list(job_stats)
     ):
         txt = "===== DATABASE {} ({}) =====\n".format(database_name, total_results)
-        txt += "===== WEEK FROM {} TO {} ({}) =====\n".format(
-            week_dt.strftime("%Y-%m-%d"), now_dt.strftime("%Y-%m-%d"), total_weekly
+        txt += "===== WEEK FROM {} TO {} ({}) {} =====\n".format(
+            week_dt.strftime("%Y-%m-%d"), now_dt.strftime("%Y-%m-%d"), total_weekly, conf.ci_plan
         )
 
         txt += "\n===== TESTS BY FAILURES [rank: name (total, passed, failed, failure rate)] ({}) =====".format(
@@ -244,7 +252,7 @@ def generate_txt_report(
             len(test_stats_quality)
         )
         index = 0
-        for test in test_stats_quality[:20]:
+        for test in test_stats_quality[:100]:
             if not test is None and isinstance(test, Statistics):
                 index += 1
                 txt += "\n{:3d}: {} ({}, {}, {}, {:5.2f}%)".format(
@@ -255,6 +263,45 @@ def generate_txt_report(
                     test.failed,
                     (1.0 - test.quality) * 100.0,
                 )
+
+                failed_tests = lookup_failed_tests_for_suite(log, results, conf.ci_plan, test.name)
+                if isinstance(failed_tests, list) and failed_tests:
+                    failed_tests_printable = []
+                    failed_tests_suppress = dict()
+
+                    for failed_test in reversed(failed_tests):
+                        if isinstance(failed_test, TopotestResult):
+                            failed_test_name = failed_test.name.split(".")[-1]
+                            failed_test_count = 1
+
+                            if failed_test_name in failed_tests_suppress:
+                                failed_test_count = failed_tests_suppress[failed_test_name]
+                                if isinstance(failed_test_count, int):
+                                    failed_test_count += 1
+                                else:
+                                    failed_test_count = 1
+
+                            failed_tests_suppress[failed_test_name] = failed_test_count
+
+                            if failed_test_count <= 3:
+                                failed_tests_printable.append(failed_test)
+
+                    for name, count in reversed(failed_tests_suppress.items()):
+                        if count > 3:
+                            txt += "\n       [ {}: suppressed {} additional failures ]".format(
+                                name, (count - 3)
+                            )
+
+                    for failed_test_printable in reversed(failed_tests_printable):
+                        if isinstance(failed_test_printable, TopotestResult):
+                            failed_test_printable_name = failed_test_printable.name.split(".")[-1]
+
+                            txt += "\n     * {} ({}/{}-{})".format(
+                                failed_test_printable_name,
+                                CI_URL_BROWSE,
+                                failed_test_printable.plan,
+                                failed_test_printable.build
+                            )
 
         txt += "\n\n===== WORST TEST TIMES [rank: name (total-time, passed, avg-time)] ({}) =====".format(
             len(time_stats)
@@ -356,6 +403,8 @@ def parse_cli_arguments(conf, log):
     )
     ap.add_argument("-hr", "--html-report", help="html report file")
     ap.add_argument("-l", "--log", help="log file")
+    ap.add_argument("-p", "--plan", help="CI plan")
+
     try:
         args = vars(ap.parse_args())
         conf_to_args = {
@@ -368,6 +417,7 @@ def parse_cli_arguments(conf, log):
             "no_html_report": "no_html_report",
             "html_report_file": "html_report",
             "log_file": "log",
+            "ci_plan": "plan",
         }
         for conf_var, arg_val in conf_to_args.items():
             if not conf_var in conf.config_no_overwrite:
@@ -421,6 +471,37 @@ def parse_cli_arguments(conf, log):
                 log.debug("overwrite attempt conf.{}".format(conf_var))
     except:
         log.abort("failed to parse arguments")
+
+
+def lookup_failed_tests_for_suite(log, results, plan_name, suite_name):
+    """ Lookup all failed tests for a specific suite """
+
+    failed_tests = []
+
+    if (
+        isinstance(log, Logger)
+        and isinstance(results, list)
+        and isinstance(plan_name, str)
+        and plan_name
+        and isinstance(suite_name, str)
+        and suite_name
+    ):
+        try:
+            for result in results:
+                if isinstance(result, TopotestResult):
+                    if (
+                        result.failed()
+                        and result.plan == plan_name
+                        and result.name.split(".", 1)[0] == suite_name
+                    ):
+                        failed_tests.append(result)
+
+        except Exception:
+            failed_tests = []
+
+            log.warn("encountered exception looking up failed tests for suit '{}'".format(suite_name))
+
+    return failed_tests
 
 
 def main():
@@ -502,13 +583,12 @@ def main():
     total_results = 0
     # TODO: [code] remove debug vars
     # try:
+    log.info("selecting results of CI plan {}".format(conf.ci_plan))
     for row in db:
         total_results += 1
         ttr = topotestresult_from_sql_tuple(row)
         if not ttr is None:
-            if ttr.plan == "FRR-FRR":  # TODO: add cli switch to select plan
-                #if ttr.plan == "TESTING-TPPR8360":  # TODO: add cli switch to select plan
-                #if ttr.plan == "FRR-FRRPULLREQ":  # TODO: add cli switch to select plan
+            if ttr.plan == conf.ci_plan:
                 if date_str_between_dates(
                     ttr.timestamp.strftime(TOPOSTAT_TTR_TIMESTAMP_FMT),
                     week_dt,
@@ -575,6 +655,9 @@ def main():
     # generate text report
     if not conf.no_txt_report:
         txt = generate_txt_report(
+            conf,
+            log,
+            results,
             conf.sqlite3_db,
             total_results,
             len(results),

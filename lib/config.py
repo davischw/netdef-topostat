@@ -256,6 +256,9 @@ class StatsConfig(Config):
         self.no_html_report = True
         self.html_report_file = "/home/topostat/report.html"
 
+        # CI plan
+        self.ci_plan = "FRR-FRR"
+
 
 class DatabaseConfig(Config):
     """database configuration type"""

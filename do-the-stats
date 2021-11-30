@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+
+./stats.py -c config/topostat.conf -p FRR-FRR
+
+./stats.py -c config/topostat.conf -p FRR-FRRCONTTOPO
+
+
+#EOF
