@@ -227,11 +227,17 @@ def generate_txt_report(
         and is_list(agent_stats)
         and is_list(job_stats)
     ):
+        txt = ""
+
+        """
         txt = "===== DATABASE {} ({}) =====\n".format(database_name, total_results)
+        """
+
         txt += "===== WEEK FROM {} TO {} ({}) {} =====\n".format(
             week_dt.strftime("%Y-%m-%d"), now_dt.strftime("%Y-%m-%d"), total_weekly, conf.ci_plan
         )
 
+        """
         txt += "\n===== TESTS BY FAILURES [rank: name (total, passed, failed, failure rate)] ({}) =====".format(
             len(test_stats_failures)
         )
@@ -247,13 +253,17 @@ def generate_txt_report(
                     test.failed,
                     (1.0 - test.quality) * 100.0,
                 )
+        """
 
-        txt += "\n\n===== TESTS BY FAILURE RATE [rank: name (total, passed, failed, failure rate)] ({}) =====".format(
+        txt += "\n===== TESTS BY FAILURE RATE [rank: name (total, passed, failed, failure rate)] ({}) =====".format(
             len(test_stats_quality)
         )
         index = 0
         for test in test_stats_quality[:100]:
             if not test is None and isinstance(test, Statistics):
+                if test.failed == 0:
+                    continue
+
                 index += 1
                 txt += "\n{:3d}: {} ({}, {}, {}, {:5.2f}%)".format(
                     index,
@@ -303,6 +313,7 @@ def generate_txt_report(
                                 failed_test_printable.build
                             )
 
+        """
         txt += "\n\n===== WORST TEST TIMES [rank: name (total-time, passed, avg-time)] ({}) =====".format(
             len(time_stats)
         )
@@ -340,6 +351,8 @@ def generate_txt_report(
                 txt += "\n{:2d}: {} ({}, {}, {}, {:5.3f})".format(
                     index, job.name, job.total, job.passed, job.failed, job.quality
                 )
+        """
+
         return txt
     return None
 

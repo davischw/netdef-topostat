@@ -3,6 +3,9 @@
 
 ./stats.py -c config/topostat.conf -p FRR-FRR
 
+echo ""
+echo ""
+
 ./stats.py -c config/topostat.conf -p FRR-FRRCONTTOPO
 
 
