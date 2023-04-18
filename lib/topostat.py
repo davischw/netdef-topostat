@@ -161,15 +161,29 @@ class TopotestResult:
                 str(self.plan),
                 str(self.build),
                 str(self.job),
-                str(self.pr),
+                self.pr if check.is_str_no_empty(self.pr) else "NULL",
             ),
         )
         conn.commit()
 
     def to_json(self):
+        json_dict = {
+            "name": str(self.name),
+            "result": str(self.result),
+            "time": str(self.time),
+            "host": str(self.host),
+            "timestamp": str(self.timestamp),
+            "plan": str(self.plan),
+            "build": str(self.build),
+            "job": str(self.job),
+        }
+
+        if check.is_str_no_empty(self.pr):
+            json_dict["pr"] = self.pr
+
         if not self.check():
             return None
-        return json.loads(json.dumps(self.__dict__))
+        return json.loads(json.dumps(json_dict))
 
     def from_json(self, json_dict):
         try:
@@ -183,23 +197,27 @@ class TopotestResult:
             self.plan = json_dict["plan"]
             self.build = json_dict["build"]
             self.job = json_dict["job"]
-            self.pr = json_dict["pr"]
+            if "pr" in json_dict:
+                self.pr = json_dict["pr"]
+            else:
+                self.pr = None
         except:
             return None
         if not self.check():
             return None
         return self
 
-    def from_case(self, case, host, plan, build, job, pr):
+    def from_case(self, case, host, plan, build, job, pr=None):
         if case is None or not isinstance(case, TestCase):
+            assert False, "from_case case check failed"
             return None
         if not (
             check.is_str_no_empty(host)
             and check.is_str_no_empty(plan)
             and check.is_str_no_empty(build)
             and check.is_str_no_empty(job)
-            and check.is_str_no_empty(pr)
         ):
+            assert False, "from_case arg check failed"
             return None
         self.version = TOPOSTAT_TTR_VERSION
         self.name = str(case.classname) + "." + str(case.name)
@@ -225,17 +243,26 @@ class TopotestResult:
         self.plan = plan
         self.build = build
         self.job = job
-        self.pr = pr
+        if check.is_str_no_empty(pr):
+            self.pr = pr
+        else:
+            self.pr = None
         return self
 
     def check(self):
-        for var in list(self.__dict__.values()):
-            if var is None:
-                return False
-            elif isinstance(var, int):
+        for key, value in self.__dict__.items():
+            print("===== DEBUG key = {}".format(key))
+            print("===== DEBUG value = {}".format(value))
+            if key == "pr":
+                if not (check.is_str_no_empty(value) or value == None):
+                    return False
                 continue
-            elif isinstance(var, str):
-                if var == "" or var == "None":
+            elif value is None:
+                return False
+            elif isinstance(value, int):
+                continue
+            elif isinstance(value, str):
+                if value == "" or value == "None":
                     return False
                 continue
             else:

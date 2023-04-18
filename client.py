@@ -185,11 +185,14 @@ def main():
         log.debug("env[bamboo_shortJobName] = {} (str)".format(job))
     except:
         log.abort("failed to get environment variable bamboo_shortJobName")
+
+    # Get optional pull request number from environment variable
     try:
-        pr = str(os.environ["bamboo_pullRequestNumber"])
-        log.debug("env[bamboo_pullRequestNumber] = {} (str)".format(pr))
+        pr = str(os.environ["bamboo_github_pullreq"])
+        log.debug("env[bamboo_github_pullreq] = {} (str)".format(pr))
     except:
-        log.abort("failed to get environment variable bamboo_pullRequestNumber")
+        pr = None
+        log.warn("failed to get environment variable bamboo_github_pullreq")
 
     # compose ZeroMQ server address string (includes DNS resolve)
     if compose_zmq_client_address_str(conf, log) is None:
@@ -213,10 +216,11 @@ def main():
             for case in suite:
                 results_total += 1
                 result = TopotestResult().from_case(
-                    case, conf.sender_id, plan, build, job
+                    case, conf.sender_id, plan, build, job, pr=pr
                 )
                 # check result
                 if not result.check():
+                    assert False, "suite in xml failed result check (suite)"
                     results_invalid += 1
                     continue
                 # do not report if test was skipped
@@ -229,10 +233,11 @@ def main():
         elif isinstance(suite, TestCase):
             results_total += 1
             result = TopotestResult().from_case(
-                suite, conf.sender_id, plan, build, job, pr
+                suite, conf.sender_id, plan, build, job, pr=pr
             )
             # check result
             if not result.check():
+                assert False, "suite in xml failed result check (case)"
                 results_invalid += 1
                 continue
             # do not report if test was skipped
