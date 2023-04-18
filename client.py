@@ -185,6 +185,11 @@ def main():
         log.debug("env[bamboo_shortJobName] = {} (str)".format(job))
     except:
         log.abort("failed to get environment variable bamboo_shortJobName")
+    try:
+        pr = str(os.environ["bamboo_pullRequestNumber"])
+        log.debug("env[bamboo_pullRequestNumber] = {} (str)".format(pr))
+    except:
+        log.abort("failed to get environment variable bamboo_pullRequestNumber")
 
     # compose ZeroMQ server address string (includes DNS resolve)
     if compose_zmq_client_address_str(conf, log) is None:
@@ -223,7 +228,9 @@ def main():
                 results_valid += 1
         elif isinstance(suite, TestCase):
             results_total += 1
-            result = TopotestResult().from_case(suite, conf.sender_id, plan, build, job)
+            result = TopotestResult().from_case(
+                suite, conf.sender_id, plan, build, job, pr
+            )
             # check result
             if not result.check():
                 results_invalid += 1

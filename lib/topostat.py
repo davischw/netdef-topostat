@@ -113,6 +113,7 @@ class TopotestResult:
         plan=None,
         build=None,
         job=None,
+        pr=None,
         version=None,  # keep version number at end of argument list
     ):
         if version is None or not isinstance(version, int):
@@ -127,6 +128,7 @@ class TopotestResult:
         self.plan = plan
         self.build = build
         self.job = job
+        self.pr = pr
 
     def create_table(self, conn, table):
         conn.cursor().execute(
@@ -140,6 +142,7 @@ class TopotestResult:
             + ", plan text"
             + ", build text"
             + ", job text"
+            + ", pr text"
             + ")"
         )
         conn.commit()
@@ -147,7 +150,7 @@ class TopotestResult:
     def insert_into(self, conn, table):
         conn.cursor().execute(
             "INSERT INTO {} (".format(table)
-            + "name, result, time, host, timestamp, plan, build, job"
+            + "name, result, time, host, timestamp, plan, build, job, pr"
             + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 str(self.name),
@@ -158,6 +161,7 @@ class TopotestResult:
                 str(self.plan),
                 str(self.build),
                 str(self.job),
+                str(self.pr),
             ),
         )
         conn.commit()
@@ -179,13 +183,14 @@ class TopotestResult:
             self.plan = json_dict["plan"]
             self.build = json_dict["build"]
             self.job = json_dict["job"]
+            self.pr = json_dict["pr"]
         except:
             return None
         if not self.check():
             return None
         return self
 
-    def from_case(self, case, host, plan, build, job):
+    def from_case(self, case, host, plan, build, job, pr):
         if case is None or not isinstance(case, TestCase):
             return None
         if not (
@@ -193,6 +198,7 @@ class TopotestResult:
             and check.is_str_no_empty(plan)
             and check.is_str_no_empty(build)
             and check.is_str_no_empty(job)
+            and check.is_str_no_empty(pr)
         ):
             return None
         self.version = TOPOSTAT_TTR_VERSION
@@ -219,6 +225,7 @@ class TopotestResult:
         self.plan = plan
         self.build = build
         self.job = job
+        self.pr = pr
         return self
 
     def check(self):

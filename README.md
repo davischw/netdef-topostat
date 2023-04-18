@@ -148,4 +148,5 @@ testing and debugging purposes they can be exported before starting the client:
 export bamboo_planKey="testPlanKey"
 export bamboo_buildNumber="testBuildNumber"
 export bamboo_shortJobName="testShortJobName"
+export bamboo_pullRequestNumber="testPullRequestNumber"
 ```
