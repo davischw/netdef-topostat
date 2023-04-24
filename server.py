@@ -371,7 +371,9 @@ def main():
         # parse received message
         msg = Message()
         try:
+            print("ping.")
             msg.from_json(json_msg)
+            print("pong.")
             if not msg.check_auth(conf.auth_key):
                 log.warn("failed to authenticate ZeroMQ message")
                 continue

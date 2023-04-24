@@ -187,8 +187,12 @@ class TopotestResult:
 
     def from_json(self, json_dict):
         try:
-            if json_dict["version"] != TOPOSTAT_TTR_VERSION:
-                return None
+            if "version" in json_dict:
+                if json_dict["version"] != TOPOSTAT_TTR_VERSION:
+                    print("DEBUG VVVVVVVVVVVVVVVVRRRRRRRRRRRRRRRGGGGGGGGGHHHHHHHHH")
+                    return None
+            else:
+                print("DEBUG: DAFUUUUUUUUUUUUUUUUQQQQQQQQQQQQQQQQQQQQQQ?????")
             self.name = json_dict["name"]
             self.result = json_dict["result"]
             self.time = json_dict["time"]
@@ -201,9 +205,12 @@ class TopotestResult:
                 self.pr = json_dict["pr"]
             else:
                 self.pr = None
-        except:
+        except Exception as e:
+            print("DEBUG BBBBBBBBBBBBBBBBBBBBBRRRRRRRRRRRGGGGGGGGGGGGGGGGHHHHH")
+            print(e)
             return None
         if not self.check():
+            print("DEBUG AAAAAAAAAAAAAAAAAAARRRRRRRRRRRRRRGGGGGGGGGGHHHHHHHHHH")
             return None
         return self
 
