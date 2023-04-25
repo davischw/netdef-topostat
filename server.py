@@ -372,6 +372,7 @@ def main():
         msg = Message()
         try:
             print("ping.")
+            print(json.dumps(json_msg))
             msg.from_json(json_msg)
             print("pong.")
             if not msg.check_auth(conf.auth_key):
