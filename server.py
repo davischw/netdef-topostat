@@ -21,6 +21,7 @@
 #
 
 
+import json
 import os
 import sys
 import signal
@@ -372,7 +373,7 @@ def main():
         msg = Message()
         try:
             print("ping.")
-            print(json.dumps(json_msg))
+            print(json.dumps(json_msg, indent=4))
             msg.from_json(json_msg)
             print("pong.")
             if not msg.check_auth(conf.auth_key):
