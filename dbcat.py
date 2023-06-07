@@ -1,99 +1,86 @@
 #!/usr/bin/env python3
 
+import os
 import sys
+from datetime import datetime
 import sqlite3
+import argparse
+import traceback
+
+TOPOSTAT_DB_TIMESTAMP_FMT = "%Y-%m-%d %H:%M:%S.%f"
+def topostat_db_timestamp_parse(raw):
+    return datetime.strptime(str(raw), TOPOSTAT_DB_TIMESTAMP_FMT)
+
+fields = [
+    ("name", str),
+    ("result", str),
+    ("time", float),
+    ("host", str),
+    ("timestamp", topostat_db_timestamp_parse),
+    ("plan", str),
+    ("build", int),
+    ("job", str),
+]
+
+def merge(conn_dst: sqlite3.Connection, db_src: sqlite3.Cursor) -> None:
+    sql = f"SELECT {', '.join(field[0] for field in fields)} FROM testresults"
+    # iteratively fetch topotest results from source database
+    try:
+        db_src.execute(sql)
+    except Exception as e:
+        raise EnvironmentError("failed to query source") from e
+
+    sql = f"INSERT INTO testresults ({', '.join(field[0] for field in fields)}) " + \
+        f"VALUES ({', '.join('?' for field in fields)})"
+    db_dst = conn_dst.cursor()
+    queue = []
+    done = 0
+
+    for row in db_src:
+        row_parsed = tuple(field[1](item) for field, item in zip(fields, row))
+        queue.append(row_parsed)
+        if len(queue) >= 10000:
+            db_dst.executemany(sql, queue)
+            conn_dst.commit()
+
+            done += len(queue)
+            queue = []
+            sys.stderr.write("\033[K> %d\r" % (done))
+            sys.stdout.flush()
+
+    if queue:
+        db_dst.executemany(sql, queue)
+        conn_dst.commit()
+
+    sys.stderr.write("\033[K")
+    sys.stdout.flush()
 
 
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("-b", "--database", help="sqlite3 database file to update")
+    ap.add_argument("INPUT_DB", nargs="+", help="database files to merge")
 
-    file_src = "/tmp/src"
-    file_dst = "/tmp/dst"
-
-    # connect to source database file
-    try:
-        conn_src = sqlite3.connect(file_src)
-        db_src = conn_src.cursor()
-    except:
-        print("failed to connect to database {}".format(file_src))
-        sys.exit(1)
+    args = ap.parse_args()
 
     # connect to destination database file
     try:
-        conn_dst = sqlite3.connect(file_dst)
-        db_dst = conn_dst.cursor()
+        conn_dst = sqlite3.connect(args.database)
+    except Exception as e:
+        print(f"failed to connect to database {args.database!r}: {e}")
+        sys.exit(1)
 
-        # TODO: create tabe if not exists
+    db_dst = conn_dst.cursor()
 
 
     # create results table if it does not exist
-        db_dst.execute(
-            "SELECT count(name) FROM sqlite_master WHERE type='table' AND name='testresults'"
-        )
+    db_dst.execute(
+        "SELECT count(name) FROM sqlite_master WHERE type='table' AND name='testresults'"
+    )
 
-        if db_dst.fetchone()[0] == 0:
-            TopotestResult().create_table(conn, )
-
-            
-            print("created table testresults in database {}".format(file_dst))
-
-    except:
-        print("failed to connect to database {}".format(file_dst))
-        sys.exit(1)
-
-
-    # iteratively fetch topotest results from source database
-    try:
-        db_src.execute("SELECT * FROM testresults")
-    except:
-        print(
-            "unable to query topotest results from table testresults in database {}".format(
-                file_src
-            )
-        )
-        sys.exit(1)
-
-    results = []
-    total_results = 0
-    # TODO: [code] remove debug vars
-    # try:
-    log.info("selecting results of CI plan {}".format(conf.ci_plan))
-    for row in db_src:
-        total_results += 1
-        ttr = topotestresult_from_sql_tuple(row)
-        if not ttr is None:
-            if ttr.plan == conf.ci_plan:
-                if date_str_between_dates(
-                    ttr.timestamp.strftime(TOPOSTAT_TTR_TIMESTAMP_FMT),
-                    week_dt,
-                    now_dt,
-                ):
-                    results.append(ttr)
-
-
-def topotestresult_from_sql_tuple(sql_tuple: tuple) -> TopotestResult:
-    """creates a TopotestResult object from an sql tuple"""
-
-    if isinstance(sql_tuple, tuple):
-        ttr = TopotestResult()
-        if len(sql_tuple) == (len(ttr.__dict__)):
-            ttr.name = str(sql_tuple[1])
-            ttr.result = str(sql_tuple[2])
-            ttr.time = float(sql_tuple[3])
-            ttr.host = str(sql_tuple[4])
-            ttr.timestamp = datetime.strptime(
-                str(sql_tuple[5]), TOPOSTAT_DB_TIMESTAMP_FMT
-            )
-            ttr.plan = str(sql_tuple[6])
-            ttr.build = int(sql_tuple[7])
-            ttr.job = str(sql_tuple[8])
-            ttr.version = TOPOSTAT_TTR_VERSION_1
-            if ttr.check():
-                return ttr
-    return None
-
-    def create_table(self, conn, table):
-        conn.cursor().execute(
-            "CREATE TABLE {} (".format(table)
+    if db_dst.fetchone()[0] == 0:
+        conn_dst.cursor().execute(
+            "CREATE TABLE testresults ("
             + "id INTEGER PRIMARY KEY AUTOINCREMENT"
             + ", name text"
             + ", result text"
@@ -105,26 +92,30 @@ def topotestresult_from_sql_tuple(sql_tuple: tuple) -> TopotestResult:
             + ", job text"
             + ")"
         )
-        conn.commit()
+        conn_dst.commit()
 
+        print(f"created table testresults in database {args.database!r}")
 
+    failures = 0
 
+    for input_db in args.INPUT_DB:
+        print(f"merging {input_db!r}...")
+        try:
+            conn_src = sqlite3.connect(input_db)
+        except Exception as e:
+            print(f"failed to connect to database {input_db!r}: {e}")
+            failures += 1
+        try:
+            db_src = conn_src.cursor()
+            merge(conn_dst, db_src)
+        except:
+            traceback.print_exc()
+            failures += 1
 
+    if failures:
+        sys.exit(1)
 
-    def insert_into(self, conn, table):
-        conn.cursor().execute(
-            "INSERT INTO {} (".format(table)
-            + "name, result, time, host, timestamp, plan, build, job"
-            + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (
-                str(self.name),
-                str(self.result),
-                str(self.time),
-                str(self.host),
-                str(self.timestamp),
-                str(self.plan),
-                str(self.build),
-                str(self.job),
-            ),
-        )
-        conn.commit()
+    sys.exit(0)
+
+if __name__ == "__main__":
+    main()
