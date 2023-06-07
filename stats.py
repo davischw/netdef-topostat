@@ -46,20 +46,41 @@ IDX_JOB = 8
 class Statistics:
     def __init__(self, name):
         self.name = name
-        self.total = 0
-        self.passed = 0
-        self.failed = 0
+        self.passed_items = 0
+        self.failed_items = 0
         self.quality = 0.0
         self.time_total = 0.0
         self.time_avg = 0.0
+        self.all_runs = set()
+        self.failed_runs = set()
+
+    @property
+    def total(self):
+        return len(self.all_runs)
+
+    @property
+    def passed(self):
+        return len(self.all_runs) - len(self.failed_runs)
+
+    @property
+    def failed(self):
+        return len(self.failed_runs)
 
     def inc_passed(self):
-        self.total += 1
-        self.passed += 1
+        self.passed_items += 1
 
     def inc_failed(self):
-        self.total += 1
-        self.failed += 1
+        self.failed_items += 1
+
+    def feed(self, result):
+        self.all_runs.add(result.build)
+        if result.passed():
+            self.inc_passed()
+            if is_float_min(result.time, 0.0):
+                self.add_time(result.time)
+        elif result.failed():
+            self.inc_failed()
+            self.failed_runs.add(result.build)
 
     def add_time(self, time):
         if is_float_min(time, 0.0):
@@ -179,21 +200,11 @@ def result_process_module_and_append_to_stats_list(result, stats_list):
         for stats in stats_list:
             if result.name.split(".", 1)[0] == stats.name:
                 in_stats_list = True
-                if result.passed():
-                    stats.inc_passed()
-                    if is_float_min(result.time, 0.0):
-                        stats.add_time(result.time)
-                elif result.failed():
-                    stats.inc_failed()
+                stats.feed(result)
                 continue
         if not in_stats_list:
             new_stats = Statistics(result.name.split(".", 1)[0])
-            if result.passed():
-                new_stats.inc_passed()
-                if is_float_min(result.time, 0.0):
-                    new_stats.add_time(result.time)
-            elif result.failed():
-                new_stats.inc_failed()
+            new_stats.feed(result)
             stats_list.append(new_stats)
 
 
