@@ -8,8 +8,11 @@ import argparse
 import traceback
 
 TOPOSTAT_DB_TIMESTAMP_FMT = "%Y-%m-%d %H:%M:%S.%f"
+
+
 def topostat_db_timestamp_parse(raw):
     return datetime.strptime(str(raw), TOPOSTAT_DB_TIMESTAMP_FMT)
+
 
 fields = [
     ("name", str),
@@ -22,6 +25,7 @@ fields = [
     ("job", str),
 ]
 
+
 def merge(conn_dst: sqlite3.Connection, db_src: sqlite3.Cursor) -> None:
     sql = f"SELECT {', '.join(field[0] for field in fields)} FROM testresults"
     # iteratively fetch topotest results from source database
@@ -30,8 +34,10 @@ def merge(conn_dst: sqlite3.Connection, db_src: sqlite3.Cursor) -> None:
     except Exception as e:
         raise EnvironmentError("failed to query source") from e
 
-    sql = f"INSERT INTO testresults ({', '.join(field[0] for field in fields)}) " + \
-        f"VALUES ({', '.join('?' for field in fields)})"
+    sql = (
+        f"INSERT INTO testresults ({', '.join(field[0] for field in fields)}) "
+        + f"VALUES ({', '.join('?' for field in fields)})"
+    )
     db_dst = conn_dst.cursor()
     queue = []
     done = 0
@@ -71,7 +77,6 @@ def main():
         sys.exit(1)
 
     db_dst = conn_dst.cursor()
-
 
     # create results table if it does not exist
     db_dst.execute(
@@ -116,6 +121,7 @@ def main():
         sys.exit(1)
 
     sys.exit(0)
+
 
 if __name__ == "__main__":
     main()
