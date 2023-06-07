@@ -596,7 +596,7 @@ def main():
 
     # iteratively fetch topotest results from database
     try:
-        db.execute("SELECT * FROM {}".format(TOPOSTAT_TESTRESULTS_TABLE))
+        db.execute("SELECT * FROM {} WHERE plan = ?".format(TOPOSTAT_TESTRESULTS_TABLE), [conf.ci_plan])
     except:
         log.abort(
             "unable to query topotest results from table {} in database {}".format(
