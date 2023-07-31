@@ -6,6 +6,11 @@
 echo ""
 echo ""
 
+./stats.py -c config/topostat.conf -p TESTING-MICRONET
+
+echo ""
+echo ""
+
 ./stats.py -c config/topostat.conf -p FRR-FRRCONTTOPO
 
 
